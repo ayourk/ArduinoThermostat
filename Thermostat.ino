@@ -31,8 +31,8 @@
 #include <Fonts/FreeSans9pt7b.h>
 #include <Fonts/FreeSansBold9pt7b.h>
 #include <Fonts/FreeSans24pt7b.h>
-#include "lcd7seg48pt7b.h"  // 7 segment digital monospace
-#include "lcd7seg72pt7b.h"  // 7 segment digital monospace
+#include "LCD7segment48pt7b.h"  // 7 segment digital monospace
+#include "LCD7segment72pt7b.h"  // 7 segment digital monospace
 #include <Adafruit_Sensor.h>
 #include "Adafruit_BME680.h"
 
