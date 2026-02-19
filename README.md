@@ -213,21 +213,22 @@ This is handled automatically by the firmware.
 
 | Board | Network | Flash | RAM | Output |
 |-------|---------|-------|-----|--------|
-| Feather M4 Express | W5500 Ethernet | 33% | - | .bin |
-| Feather M4 CAN | W5500 Ethernet | 33% | - | .bin |
-| Feather M0 WiFi | WINC1500 WiFi | 73% | - | .bin |
-| Feather M0 Express | W5500 Ethernet | 73% | - | .bin |
-| Feather RP2040 | W5500 Ethernet | 2% | 9% | .uf2 |
-| Feather ESP32-S2 | WiFi | 38% | 24% | .bin |
-| Feather ESP32-S2 | Dual (PoE+WiFi) | 39% | 24% | .bin |
-| Feather ESP32-S2 TFT | WiFi | 38% | 24% | .bin |
-| Feather ESP32-S3 | WiFi | 40% | 25% | .bin |
-| Feather ESP32-S3 | Dual (PoE+WiFi) | 41% | 25% | .bin |
-| Feather ESP32-S3 TFT | WiFi | 40% | 25% | .bin |
-| Feather ESP32 V2 | Dual (PoE+WiFi) | 35% | 19% | .bin |
-| Feather nRF52840 | W5500 Ethernet | 19% | 9% | .zip |
-| Feather nRF52840 Sense | W5500 Ethernet | 19% | 9% | .zip |
-| Feather STM32F405 | W5500 Ethernet | 10% | 11% | .bin |
+| Feather M4 Express | W5500 Ethernet | 42% | - | .bin |
+| Feather M4 CAN | W5500 Ethernet | 42% | - | .bin |
+| Feather M0 WiFi | WINC1500 WiFi | 92% | - | .bin |
+| Feather M0 Express | W5500 Ethernet | 92% | - | .bin |
+| Feather RP2040 | W5500 Ethernet | 3% | 5% | .uf2 |
+| Feather ESP32-S2 | WiFi | 40% | 21% | .bin |
+| Feather ESP32-S2 | Dual (PoE+WiFi) | 44% | 21% | .bin |
+| Feather ESP32-S2 TFT | WiFi | 40% | 21% | .bin |
+| Feather ESP32-S3 | WiFi | 41% | 22% | .bin |
+| Feather ESP32-S3 | Dual (PoE+WiFi) | 45% | 22% | .bin |
+| Feather ESP32-S3 TFT | WiFi | 41% | 22% | .bin |
+| Feather ESP32 V2 | WiFi | 35% | 16% | .bin |
+| Feather ESP32 V2 | Dual (PoE+WiFi) | 39% | 16% | .bin |
+| Feather nRF52840 | W5500 Ethernet | 18% | 5% | .zip |
+| Feather nRF52840 Sense | W5500 Ethernet | 18% | 5% | .zip |
+| Feather STM32F405 | W5500 Ethernet | 9% | 3% | .bin |
 
 ### Using build-all.sh (Recommended)
 
