@@ -1,0 +1,271 @@
+# LCD Layout Reference
+# eyeSPI Thermostat Display Layout Documentation
+#
+# Based on Honeywell FocusPro TH5110D thermostat appearance
+# Target display: 320x240 ILI9341 TFT with capacitive touch
+#
+# This document describes the pixel-level layout of the thermostat
+# display, including element positions, sizes, fonts, and colors.
+
+
+================================================================================
+                              SCREEN DIMENSIONS
+================================================================================
+
+  Width:  320 pixels
+  Height: 240 pixels
+  Orientation: Landscape
+
+
+================================================================================
+                                 COLOR SCHEME
+================================================================================
+
+  Element             Color Name        Hex Value     ILI9341 Constant
+  ─────────────────   ───────────────   ────────────  ──────────────────
+  Background          Black             #000000       ILI9341_BLACK
+  Primary text        Green             #00FF00       ILI9341_GREEN
+  Dimmed text         Dark Green        #008000       ILI9341_DARKGREEN
+  Labels              Yellow            #FFFF00       ILI9341_YELLOW
+  Warnings            Red               #FF0000       ILI9341_RED
+
+
+================================================================================
+                              SCREEN LAYOUT MAP
+================================================================================
+
+    0         80        160       240       320
+    ├─────────┼─────────┼─────────┼─────────┤
+  0 │ Inside        │ Replace │  Heat  Cool  │
+    │               │ Battery │              │
+ 22 │───────────────┴─────────│   Setting    │
+    │                         │              │
+    │   ██  ██                │              │
+    │  █  ██  █      ┌────────┤   ██  ██     │
+    │  █  ██  █      │        │  █  ██  █    │
+    │  █  ██  █      │        │  █  ██  █    │
+    │   ██  ██       │ Heat On│              │
+123 │     72°        │ Cool On│     48°      │
+    │                │Aux Heat│              │
+    │                │   On   │              │
+152 ├────────────────┴────────┼──────────────┤
+    │┌──────────────────────┐ │┌────────────┐│
+    ││ Fan                  │ ││ System     ││
+    ││ ──────────────────── │ ││ ────────── ││
+    ││ Auto         On      │ ││ Heat   Off ││
+    ││                      │ ││ Cool  Auto ││
+232 │└──────────────────────┘ │└────────────┘│
+240 └─────────────────────────┴──────────────┘
+
+
+================================================================================
+                           ELEMENT POSITIONS (pixels)
+================================================================================
+
+LABELS AND INDICATORS
+─────────────────────────────────────────────────────────────────────────────────
+
+  "Inside" label
+    Position:     (8, 22)
+    Font:         FreeSansBold9pt7b
+    Color:        Yellow (COLOR_LABEL)
+
+  "Replace Battery" warning (two lines)
+    Line 1:       (70, 18) "Replace"
+    Line 2:       (70, 31) "Battery"
+    Font:         FreeSansBold9pt7b
+    Color:        Red (COLOR_WARNING) when shown
+    Note:         Only visible when battery low
+
+  "Heat" / "Cool" labels
+    Heat:         (195, 22)
+    Cool:         (255, 22)
+    Font:         FreeSansBold9pt7b
+    Color:        Yellow (COLOR_LABEL)
+
+  "Setting" label
+    Position:     (215, 42)
+    Font:         FreeSansBold9pt7b
+    Color:        Yellow (COLOR_LABEL)
+
+  Status indicators
+    "Heat On":            (164, 130)
+    "Cool On":            (230, 130)
+    "Auxiliary Heat On":  (164, 148)
+    Font:         FreeSansBold9pt7b (Heat/Cool On)
+                  FreeSans9pt7b (Auxiliary)
+    Color:        Yellow (COLOR_LABEL) when active
+
+
+TEMPERATURE DISPLAYS
+─────────────────────────────────────────────────────────────────────────────────
+
+  Large temperature (inside/current)
+    Position:     (10, 123) - baseline
+    Font:         LCD7segment72pt7b (custom)
+    Digit size:   48w × 85h pixels approx
+    Degree symbol: 7px radius circle, offset +10px right of digits
+    Color:        Green (COLOR_TEXT)
+    Format:       2 digits + degree symbol (e.g., "72°")
+
+  Small temperature (setpoint/target)
+    Position:     (200, 106) - baseline
+    Font:         LCD7segment48pt7b (custom)
+    Digit size:   32w × 58h pixels approx
+    Degree symbol: 5px radius circle
+    Color:        Green (COLOR_TEXT)
+    Format:       2 digits + degree symbol (e.g., "68°")
+
+
+CONTROL BOXES
+─────────────────────────────────────────────────────────────────────────────────
+
+  Fan Box
+    Position:     (8, 152)
+    Size:         148w × 80h pixels
+    Corner radius: 8px
+    Border color: Yellow (COLOR_LABEL)
+
+    Internal layout:
+      Header "Fan":     (+10, +18) from box origin
+      Underline:        Y = box_y + 26, from x+8 to x+140
+      "Auto":           (+12, +44)
+      "On":             (+70, +44)
+
+    Mode colors:
+      Active mode:      Green (COLOR_TEXT)
+      Inactive mode:    Dark Green (COLOR_TEXT_DIM)
+
+  System Box
+    Position:     (164, 152)
+    Size:         148w × 80h pixels
+    Corner radius: 8px
+    Border color: Yellow (COLOR_LABEL)
+
+    Internal layout:
+      Header "System":  (+10, +18) from box origin
+      Underline:        Y = box_y + 26
+      Line 1:           "Heat" (+12, +44)    "Off" (+80, +44)
+      Line 2:           "Cool" (+12, +64)    "Auto" (+80, +64)
+
+    Mode colors:
+      Active mode:      Green (COLOR_TEXT)
+      Inactive mode:    Dark Green (COLOR_TEXT_DIM)
+
+
+================================================================================
+                              TOUCH ZONES
+================================================================================
+
+The display is divided into touch-sensitive regions:
+
+  Left half (Fan control area)
+    X range:      0 to 159
+    Y range:      0 to 149 (above boxes)
+    Action:       Cycle fan mode (Auto → On → Auto)
+
+  Right half (System control / temp adjust)
+    X range:      160 to 319
+    Y range:      0 to 149 (above boxes)
+    Action:       Adjust setpoint temperature
+
+  Fan Box touch area
+    X range:      8 to 155
+    Y range:      152 to 231
+    Action:       Toggle fan mode
+
+  System Box touch area
+    X range:      164 to 311
+    Y range:      152 to 231
+    Action:       Cycle system mode (Heat → Off → Cool → Auto → Heat)
+
+
+================================================================================
+                               FONTS USED
+================================================================================
+
+  Font                    Size    Purpose
+  ──────────────────────  ──────  ─────────────────────────────────────────────
+  LCD7segment72pt7b       72pt    Large temperature display (current temp)
+  LCD7segment48pt7b       48pt    Small temperature display (setpoint)
+  FreeSansBold9pt7b       9pt     Labels, headers, status indicators
+  FreeSans9pt7b           9pt     Mode options, auxiliary heat indicator
+  FreeSans24pt7b          24pt    (Available but not used in standard layout)
+
+
+================================================================================
+                        CUSTOM 7-SEGMENT FONT NOTES
+================================================================================
+
+The LCD7segment fonts are custom-generated to mimic the appearance of a
+classic LCD thermostat display. Key characteristics:
+
+  - Monospace digits (0-9) for clean temperature display
+  - Segment gaps visible for authentic LCD look
+  - Includes minus sign for negative temperatures
+  - Degree symbol drawn separately as a circle (not part of font)
+
+Font files:
+  LCD7segment48pt7b.h    - 48-point for setpoint display
+  LCD7segment72pt7b.h    - 72-point for current temperature
+
+Generator tools:
+  font_generator.html    - Browser-based font generator
+  generate_font.js       - JavaScript font generation logic
+  lcd_7segment_font.svg  - Source vector glyphs
+
+
+================================================================================
+                         WEB INTERFACE MIRROR
+================================================================================
+
+The web interface uses an HTML5 Canvas to mirror the TFT display. The same
+layout constants should be used to ensure pixel-perfect alignment:
+
+  Canvas size:            320 × 240 (matches TFT)
+  Scaling:                CSS transform for responsive sizing
+  Font substitution:      Web-safe fonts or embedded @font-face
+  Color mapping:          Same hex values as TFT constants
+
+Reference files:
+  lcd_reference.html     - Static reference showing all elements
+  web_demo.html          - Interactive web mirror prototype
+  lcd_font_test.html     - Font rendering test page
+
+
+================================================================================
+                            DRAWING ORDER
+================================================================================
+
+For flicker-free updates, draw elements in this order:
+
+  1. Fill screen with background (only on full redraw)
+  2. Draw static labels (Inside, Heat, Cool, Setting)
+  3. Draw Fan box outline and header
+  4. Draw System box outline and header
+  5. Draw large temperature
+  6. Draw small temperature
+  7. Draw status indicators (Heat On, Cool On, etc.)
+  8. Draw mode selections in boxes
+
+For partial updates (e.g., temperature change only):
+  1. Clear old temperature by drawing in background color
+  2. Draw new temperature in text color
+
+This avoids full-screen redraws and reduces flicker.
+
+
+================================================================================
+                              IMPLEMENTATION
+================================================================================
+
+The layout is implemented in Thermostat.ino with these key functions:
+
+  LayoutDisplay()         - Draws the complete static layout
+  updateTemperature()     - Updates temperature displays
+  drawStatusIndicators()  - Updates Heat On / Cool On indicators
+  handleTouch()           - Processes touch input by zone
+
+The lcd_layout.h file contains a LCDLayout class that encapsulates all
+drawing functions. While not currently #included in the main sketch, it
+serves as a reference implementation and can be used for modular builds.

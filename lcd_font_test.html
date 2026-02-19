@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>7-Segment LCD Font Test</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            background: #1a1a2e;
+            color: #fff;
+            padding: 20px;
+        }
+        .test-row {
+            display: flex;
+            gap: 40px;
+            margin: 20px 0;
+            align-items: flex-start;
+        }
+        canvas {
+            background: #000;
+            border: 1px solid #333;
+        }
+        .label {
+            color: #888;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+        h2 {
+            color: #FFFF00;
+            margin-top: 30px;
+        }
+        .info {
+            background: #2a2a2a;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <h1>7-Segment LCD Font Development - Digit 8</h1>
+    
+    <div class="info">
+        <strong>7-Segment Naming Convention:</strong><br>
+        Industry standard segment labels A through G:<br>
+        <div style="display:flex;align-items:center;gap:16px;margin:8px 0">
+        <canvas id="segLabel" width="140" height="180"></canvas>
+        <span style="font-size:.85em;line-height:1.6">
+        A = top horizontal<br>B = upper-right vertical<br>C = lower-right vertical<br>
+        D = bottom horizontal<br>E = lower-left vertical<br>F = upper-left vertical<br>
+        G = middle horizontal</span>
+        </div>
+
+        <strong>Geometry Rules:</strong><br>
+        • Digit is made of TWO OVERLAPPING SQUARES (they share segment G — the middle bar)<br>
+        • Each square is W × W where W = digit width<br>
+        • Squares overlap by thickness t, so total height = 2W - t<br>
+        • X diagonals meet at center of segment G<br>
+        • All gaps should be equal (top, middle, bottom)
+    </div>
+
+    <h2>Digit 8 - Multiple Sizes (height = 2×width - thickness)</h2>
+    <div class="test-row">
+        <div>
+            <canvas id="large8" width="80" height="120"></canvas>
+            <div class="label">Large: 48×96</div>
+        </div>
+        <div>
+            <canvas id="medium8" width="55" height="85"></canvas>
+            <div class="label">Medium: 32×64</div>
+        </div>
+        <div>
+            <canvas id="small8" width="45" height="65"></canvas>
+            <div class="label">Small: 24×48</div>
+        </div>
+    </div>
+
+    <h2>Geometry Debug View</h2>
+    <div class="test-row">
+        <div>
+            <canvas id="debug" width="320" height="300"></canvas>
+            <div class="label">Yellow squares, Red X diagonals, Green segments</div>
+        </div>
+    </div>
+
+    <script>
+        const segmentMap = {
+            '8': [1,1,1,1,1,1,1]  // All segments on for testing
+        };
+
+        /**
+         * Draw a 7-segment digit "8"
+         * 
+         * GEOMETRY:
+         * - Digit consists of two overlapping squares
+         * - The squares share/overlap at the middle segment G
+         * - X diagonals go corner-to-corner, meeting at center of G
+         * - This makes all gaps equal (top, middle, bottom)
+         */
+        function draw7Seg(ctx, x, y, digit, color, width) {
+            const segs = segmentMap[digit] || segmentMap['8'];
+            
+            const W = width;
+            
+            // Segment thickness
+            const t = Math.max(3, Math.round(W * 0.15));
+            const halfT = t / 2;
+            
+            // Gap between segments
+            const gap = Math.max(1, Math.round(t * 0.12));
+            
+            // Each square is W × W, but they overlap by t (thickness of G)
+            // Top square: from y to y + W
+            // Bottom square: from y + W - t to y + 2W - t
+            // Total height = 2W - t
+            const H = 2 * W - t;
+            const midY = y + W - halfT;  // Center of segment G (where squares overlap)
+            
+            ctx.fillStyle = color;
+            
+            // Draw horizontal segment centered at cy
+            function drawHSeg(leftTip, rightTip, cy) {
+                ctx.beginPath();
+                ctx.moveTo(leftTip, cy);
+                ctx.lineTo(leftTip + halfT, cy - halfT);
+                ctx.lineTo(rightTip - halfT, cy - halfT);
+                ctx.lineTo(rightTip, cy);
+                ctx.lineTo(rightTip - halfT, cy + halfT);
+                ctx.lineTo(leftTip + halfT, cy + halfT);
+                ctx.closePath();
+                ctx.fill();
+            }
+            
+            // Draw vertical segment centered at cx
+            function drawVSeg(cx, topTip, bottomTip) {
+                ctx.beginPath();
+                ctx.moveTo(cx, topTip);
+                ctx.lineTo(cx + halfT, topTip + halfT);
+                ctx.lineTo(cx + halfT, bottomTip - halfT);
+                ctx.lineTo(cx, bottomTip);
+                ctx.lineTo(cx - halfT, bottomTip - halfT);
+                ctx.lineTo(cx - halfT, topTip + halfT);
+                ctx.closePath();
+                ctx.fill();
+            }
+            
+            // Horizontal segment Y centers
+            const aY = y + halfT;           // Top segment A
+            const gY = midY;                // Middle segment G
+            const dY = y + H - halfT;       // Bottom segment D
+            
+            // Horizontal segment tips (X positions)
+            const hLeft = x + halfT + gap;
+            const hRight = x + W - halfT - gap;
+            
+            // Vertical segment X centers
+            const vLeftX = x + halfT;
+            const vRightX = x + W - halfT;
+            
+            // Vertical segment tips (Y positions)
+            // The gap between vertical segment tip and horizontal segment should equal
+            // the diagonal gap at corners. Since corners have gap along both X and Y,
+            // the vertical tips should be closer to G.
+            
+            // Top segments (F, B): from below A to above G
+            const topSegTop = y + halfT + gap;
+            const topSegBot = midY - gap;  // tip meets G with same gap as corners
+            
+            // Bottom segments (E, C): from below G to above D
+            const botSegTop = midY + gap;  // tip meets G with same gap as corners
+            const botSegBot = y + H - halfT - gap;
+            
+            // Draw all segments
+            if (segs[0]) drawHSeg(hLeft, hRight, aY);              // A
+            if (segs[1]) drawVSeg(vRightX, topSegTop, topSegBot);  // B
+            if (segs[2]) drawVSeg(vRightX, botSegTop, botSegBot);  // C
+            if (segs[3]) drawHSeg(hLeft, hRight, dY);              // D
+            if (segs[4]) drawVSeg(vLeftX, botSegTop, botSegBot);   // E
+            if (segs[5]) drawVSeg(vLeftX, topSegTop, topSegBot);   // F
+            if (segs[6]) drawHSeg(hLeft, hRight, gY);              // G
+            
+            // Return actual height for callers that need it
+            return H;
+        }
+
+        /**
+         * Debug view with squares and X diagonals
+         */
+        function drawDebug(ctx, x, y, width) {
+            const W = width;
+            const t = Math.max(3, Math.round(W * 0.15));
+            const halfT = t / 2;
+            const gap = Math.max(1, Math.round(t * 0.12));
+            const H = 2 * W - t;
+            const midY = y + W - halfT;  // Center of G, where X's meet
+            
+            // Draw the digit
+            draw7Seg(ctx, x, y, '8', '#00FF00', width);
+            
+            // Draw the two overlapping squares (yellow dashed)
+            ctx.strokeStyle = '#FFFF00';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([4, 4]);
+            // Top square: y to y + W
+            ctx.strokeRect(x, y, W, W);
+            // Bottom square: y + W - t to y + 2W - t (overlaps top by t)
+            ctx.strokeRect(x, y + W - t, W, W);
+            ctx.setLineDash([]);
+            
+            // Draw X diagonals (red solid)
+            // Both X's meet at the center of G (midY)
+            ctx.strokeStyle = '#FF0000';
+            ctx.lineWidth = 1;
+            
+            // Top square X - corners at (x,y), (x+W,y), and meeting at midY
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x + W, midY + halfT);  // to bottom-right of top square
+            ctx.moveTo(x + W, y);
+            ctx.lineTo(x, midY + halfT);      // to bottom-left of top square
+            ctx.stroke();
+            
+            // Bottom square X - meeting at midY to corners at bottom
+            ctx.beginPath();
+            ctx.moveTo(x, midY - halfT);      // from top-left of bottom square
+            ctx.lineTo(x + W, y + H);
+            ctx.moveTo(x + W, midY - halfT);  // from top-right of bottom square
+            ctx.lineTo(x, y + H);
+            ctx.stroke();
+            
+            // Draw center line through G
+            ctx.strokeStyle = '#FF00FF';
+            ctx.setLineDash([2, 2]);
+            ctx.beginPath();
+            ctx.moveTo(x - 10, midY);
+            ctx.lineTo(x + W + 10, midY);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            
+            // Labels
+            ctx.fillStyle = '#FFFFFF';
+            ctx.font = '12px monospace';
+            const labelX = x + W + 20;
+            ctx.fillText(`Width: ${W}px`, labelX, y + 20);
+            ctx.fillText(`Height: ${H}px (2W - t)`, labelX, y + 40);
+            ctx.fillText(`Square: ${W}×${W}`, labelX, y + 60);
+            ctx.fillText(`Overlap: ${t}px`, labelX, y + 80);
+            ctx.fillText(`Thickness: ${t}px`, labelX, y + 100);
+            ctx.fillText(`Gap: ${gap}px`, labelX, y + 120);
+            
+            ctx.fillStyle = '#FFFF00';
+            ctx.fillText('Yellow: squares', labelX, y + 160);
+            ctx.fillStyle = '#FF0000';
+            ctx.fillText('Red: X diagonals', labelX, y + 180);
+            ctx.fillStyle = '#FF00FF';
+            ctx.fillText('Magenta: G center', labelX, y + 200);
+        }
+
+        // Segment label diagram
+        (function() {
+            const canvas = document.getElementById('segLabel');
+            const ctx = canvas.getContext('2d');
+            const W = 60, x = 40, y = 15;
+            const t = Math.max(3, Math.round(W * 0.15));
+            const halfT = t / 2;
+            const gap = Math.max(1, Math.round(t * 0.12));
+            const H = 2 * W - t;
+            const midY = y + W - halfT;
+
+            // Draw dim "8" as background
+            draw7Seg(ctx, x, y, '8', '#1a3a1a', W);
+
+            // Label positions for each segment
+            const labels = [
+                { letter: 'A', color: '#FF4444', seg: 0 },
+                { letter: 'B', color: '#FF8800', seg: 1 },
+                { letter: 'C', color: '#FFFF00', seg: 2 },
+                { letter: 'D', color: '#44FF44', seg: 3 },
+                { letter: 'E', color: '#44BBFF', seg: 4 },
+                { letter: 'F', color: '#AA66FF', seg: 5 },
+                { letter: 'G', color: '#FF44FF', seg: 6 }
+            ];
+
+            // Draw each segment individually in its color with label
+            const hLeft = x + halfT + gap, hRight = x + W - halfT - gap;
+            const aY = y + halfT, gY = midY, dY = y + H - halfT;
+            const vLeftX = x + halfT, vRightX = x + W - halfT;
+            const topSegTop = y + halfT + gap, topSegBot = midY - gap;
+            const botSegTop = midY + gap, botSegBot = y + H - halfT - gap;
+
+            // Horizontal segment helper
+            function drawH(cy, color) {
+                ctx.fillStyle = color;
+                ctx.beginPath();
+                ctx.moveTo(hLeft, cy); ctx.lineTo(hLeft + halfT, cy - halfT);
+                ctx.lineTo(hRight - halfT, cy - halfT); ctx.lineTo(hRight, cy);
+                ctx.lineTo(hRight - halfT, cy + halfT); ctx.lineTo(hLeft + halfT, cy + halfT);
+                ctx.closePath(); ctx.fill();
+            }
+            // Vertical segment helper
+            function drawV(cx, topTip, bottomTip, color) {
+                ctx.fillStyle = color;
+                ctx.beginPath();
+                ctx.moveTo(cx, topTip); ctx.lineTo(cx + halfT, topTip + halfT);
+                ctx.lineTo(cx + halfT, bottomTip - halfT); ctx.lineTo(cx, bottomTip);
+                ctx.lineTo(cx - halfT, bottomTip - halfT); ctx.lineTo(cx - halfT, topTip + halfT);
+                ctx.closePath(); ctx.fill();
+            }
+
+            // Draw colored segments
+            drawH(aY, labels[0].color);                           // A
+            drawV(vRightX, topSegTop, topSegBot, labels[1].color); // B
+            drawV(vRightX, botSegTop, botSegBot, labels[2].color); // C
+            drawH(dY, labels[3].color);                           // D
+            drawV(vLeftX, botSegTop, botSegBot, labels[4].color);  // E
+            drawV(vLeftX, topSegTop, topSegBot, labels[5].color);  // F
+            drawH(gY, labels[6].color);                           // G
+
+            // Draw labels
+            ctx.font = 'bold 14px monospace';
+            ctx.textAlign = 'center';
+            const cx = x + W / 2;
+            // A - above top
+            ctx.fillStyle = labels[0].color; ctx.fillText('A', cx, y - 2);
+            // B - right of upper-right
+            ctx.fillStyle = labels[1].color; ctx.textAlign = 'left';
+            ctx.fillText('B', x + W + 4, y + W / 2 - halfT);
+            // C - right of lower-right
+            ctx.fillStyle = labels[2].color;
+            ctx.fillText('C', x + W + 4, midY + (y + H - midY) / 2);
+            // D - below bottom
+            ctx.fillStyle = labels[3].color; ctx.textAlign = 'center';
+            ctx.fillText('D', cx, y + H + 14);
+            // E - left of lower-left
+            ctx.fillStyle = labels[4].color; ctx.textAlign = 'right';
+            ctx.fillText('E', x - 4, midY + (y + H - midY) / 2);
+            // F - left of upper-left
+            ctx.fillStyle = labels[5].color;
+            ctx.fillText('F', x - 4, y + W / 2 - halfT);
+            // G - centered above middle segment
+            ctx.fillStyle = labels[6].color; ctx.textAlign = 'center';
+            ctx.fillText('G', cx, midY - halfT - 3);
+        })();
+
+        // Draw test digits
+        (function() {
+            const canvas = document.getElementById('large8');
+            const ctx = canvas.getContext('2d');
+            draw7Seg(ctx, 16, 12, '8', '#00FF00', 48);
+        })();
+
+        (function() {
+            const canvas = document.getElementById('medium8');
+            const ctx = canvas.getContext('2d');
+            draw7Seg(ctx, 12, 10, '8', '#00FF00', 32);
+        })();
+
+        (function() {
+            const canvas = document.getElementById('small8');
+            const ctx = canvas.getContext('2d');
+            draw7Seg(ctx, 10, 8, '8', '#00FF00', 24);
+        })();
+
+        // Debug view
+        (function() {
+            const canvas = document.getElementById('debug');
+            const ctx = canvas.getContext('2d');
+            drawDebug(ctx, 30, 25, 100);
+        })();
+
+        console.log('7-segment LCD font test loaded successfully');
+    </script>
+</body>
+</html>

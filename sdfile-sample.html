@@ -1,0 +1,257 @@
+<!DOCTYPE html><html><head>
+<meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>SD Card Manager</title><style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#000;color:#eee;min-height:100vh}
+body{background:#000;padding:20px}
+.container{max-width:800px;margin:0 auto}
+h1{font-weight:300;margin-bottom:10px}
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:15px;align-items:center}
+.breadcrumb{background:rgba(255,255,255,0.1);padding:8px 15px;border-radius:6px;font-size:14px;flex-grow:1}
+.breadcrumb a{color:#60a5fa;text-decoration:none}.breadcrumb a:hover{text-decoration:underline}
+.btn{padding:8px 16px;font-size:13px;border:none;border-radius:6px;cursor:pointer;transition:all 0.2s;font-weight:500}
+.btn-primary{background:#4ade80;color:#000}.btn-primary:hover{background:#22c55e}
+.btn-danger{background:#ef4444;color:#fff}.btn-danger:hover{background:#dc2626}
+.btn-secondary{background:#64748b;color:#fff}.btn-secondary:hover{background:#475569}
+.btn-warning{background:#f59e0b;color:#000}.btn-warning:hover{background:#d97706}
+.btn:disabled{opacity:0.5;cursor:not-allowed}
+.card{background:rgba(255,255,255,0.08);border-radius:10px;padding:15px;margin-bottom:15px}
+.file-list{list-style:none}
+.file-item{display:flex;align-items:center;padding:10px;border-bottom:1px solid rgba(255,255,255,0.1);gap:10px}
+.file-item:last-child{border-bottom:none}.file-item:hover{background:rgba(255,255,255,0.05)}
+.file-icon{font-size:20px;width:30px;text-align:center}
+.file-name{flex-grow:1;cursor:pointer;word-break:break-all}.file-name:hover{color:#60a5fa}
+.file-size{color:#888;font-size:12px;width:80px;text-align:right}
+.file-actions{display:flex;gap:5px}.file-actions .btn{padding:4px 10px;font-size:12px}
+.empty{text-align:center;color:#888;padding:40px}
+.modal{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);justify-content:center;align-items:center;z-index:1000;padding:20px}
+.modal.active{display:flex}
+.modal-content{background:#1e293b;border-radius:12px;width:100%;max-width:700px;max-height:90vh;display:flex;flex-direction:column}
+.modal-header{padding:15px 20px;border-bottom:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;align-items:center}
+.modal-header h2{font-size:16px;font-weight:500}
+.modal-close{background:none;border:none;color:#fff;font-size:24px;cursor:pointer;opacity:0.7}
+.modal-close:hover{opacity:1}
+.modal-body{padding:20px;flex-grow:1;overflow:auto}
+.modal-footer{padding:15px 20px;border-top:1px solid rgba(255,255,255,0.1);display:flex;justify-content:flex-end;gap:10px}
+textarea{width:100%;height:400px;background:#0f172a;border:1px solid #334155;border-radius:6px;color:#e2e8f0;padding:12px;font-family:monospace;font-size:13px;resize:vertical}
+textarea:focus{outline:none;border-color:#60a5fa}
+.input-group{margin-bottom:15px}
+.input-group label{display:block;margin-bottom:5px;font-size:13px;color:#94a3b8}
+.input-group input{width:100%;padding:10px;background:#0f172a;border:1px solid #334155;border-radius:6px;color:#fff;font-size:14px}
+.input-group input:focus{outline:none;border-color:#60a5fa}
+.status{margin-top:10px;padding:10px;border-radius:6px;font-size:13px}
+.status.error{background:rgba(239,68,68,0.2);color:#fca5a5}
+.status.success{background:rgba(74,222,128,0.2);color:#86efac}
+.status{display:none}
+.info{background:rgba(96,165,250,0.1);border:1px solid #60a5fa;border-radius:6px;padding:12px;margin-bottom:15px;font-size:13px}
+.loading{text-align:center;padding:40px;color:#888}
+</style></head><body>
+<div class='container'>
+<h1>&#128193; SD Card Manager</h1>
+<p style='color:#888;margin-bottom:20px;font-size:14px'>Manage files on SD card</p>
+<div class='toolbar'>
+<div class='breadcrumb' id='breadcrumb'>/</div>
+<button class='btn btn-primary' onclick='showNewFile()'>&#10133; New</button>
+<button class='btn btn-secondary' onclick='showUpload()'>&#8593; Upload</button>
+<button class='btn btn-danger' onclick='confirmFormat()'>&#128465; Format</button>
+</div>
+<div class='card'>
+<ul class='file-list' id='fileList'><li class='loading'>Loading...</li></ul>
+</div>
+<div style='text-align:center;margin-top:20px'>
+<a href='/' style='color:#4ade80;text-decoration:none'>&#8592; Back to Thermostat</a>
+ &nbsp;|&nbsp;
+<a href='/config' style='color:#60a5fa;text-decoration:none'>&#9881; Configuration</a>
+ &nbsp;|&nbsp;
+<a href='/update' style='color:#888;text-decoration:none'>&#128295; Firmware Update</a>
+</div>
+</div>
+<div class='modal' id='editorModal'>
+<div class='modal-content'>
+<div class='modal-header'>
+<h2 id='editorTitle'>Edit File</h2>
+<button class='modal-close' onclick='closeEditor()'>&times;</button>
+</div>
+<div class='modal-body'>
+<textarea id='editorContent' spellcheck='false'></textarea>
+<div class='status' id='editorStatus'></div>
+</div>
+<div class='modal-footer'>
+<button class='btn btn-secondary' onclick='closeEditor()'>Cancel</button>
+<button class='btn btn-primary' id='saveBtn' onclick='saveFile()'>Save</button>
+</div>
+</div></div>
+<div class='modal' id='newFileModal'>
+<div class='modal-content' style='max-width:400px'>
+<div class='modal-header'>
+<h2>New File</h2>
+<button class='modal-close' onclick='closeNewFile()'>&times;</button>
+</div>
+<div class='modal-body'>
+<div class='input-group'>
+<label>Filename</label>
+<input type='text' id='newFileName' placeholder='example.txt'>
+</div>
+<div class='status' id='newFileStatus'></div>
+</div>
+<div class='modal-footer'>
+<button class='btn btn-secondary' onclick='closeNewFile()'>Cancel</button>
+<button class='btn btn-primary' onclick='createFile()'>Create</button>
+</div>
+</div></div>
+<div class='modal' id='formatModal'>
+<div class='modal-content' style='max-width:420px'>
+<div class='modal-header'>
+<h2 style='color:#ef4444'>&#9888; Format SD Card</h2>
+<button class='modal-close' onclick='closeFormat()'>&times;</button>
+</div>
+<div class='modal-body'>
+<div style='margin-bottom:15px'>
+<label style='display:block;margin-bottom:5px;font-weight:bold'>Format Type:</label>
+<select id='formatType' style='width:100%;padding:8px;background:#374151;color:#e5e7eb;border:1px solid #4b5563;border-radius:4px'>
+<option value='quick'>Quick (delete files only)</option>
+<option value='auto'>Auto (FAT32 or exFAT based on size)</option>
+<option value='fat32'>FAT32 (for cards up to 32GB)</option>
+<option value='exfat'>exFAT (for any size card)</option>
+</select>
+</div>
+<div style='background:#1f2937;padding:10px;border-radius:4px;margin-bottom:15px;font-size:13px'>
+<p style='margin:0 0 8px 0'><strong>Quick:</strong> Deletes files, keeps filesystem</p>
+<p style='margin:0 0 8px 0'><strong>Auto:</strong> Full format, auto-selects best type</p>
+<p style='margin:0 0 8px 0'><strong>FAT32:</strong> Compatible with most devices</p>
+<p style='margin:0'><strong>exFAT:</strong> Best for large files &gt;4GB</p>
+</div>
+<p style='color:#fca5a5;font-size:13px;margin-bottom:10px'>&#9888; All data will be erased! This cannot be undone.</p>
+<div class='status' id='formatStatus'></div>
+</div>
+<div class='modal-footer'>
+<button class='btn btn-secondary' onclick='closeFormat()'>Cancel</button>
+<button class='btn btn-danger' id='formatBtn' onclick='doFormat()'>Format SD Card</button>
+</div>
+</div></div>
+<div class='modal' id='uploadModal'>
+<div class='modal-content' style='max-width:450px'>
+<div class='modal-header'>
+<h2>&#8593; Upload File</h2>
+<button class='modal-close' onclick='closeUpload()'>&times;</button>
+</div>
+<div class='modal-body'>
+<div class='input-group'>
+<label>Select File</label>
+<input type='file' id='uploadFile' onchange='fileSelected()'>
+</div>
+<div id='uploadInfo' style='font-size:13px;color:#888;margin-bottom:10px'></div>
+<div style='background:#0f172a;border-radius:6px;height:8px;overflow:hidden;display:none' id='uploadProgress'>
+<div id='uploadBar' style='background:#4ade80;height:100%;width:0%;transition:width 0.2s'></div>
+</div>
+<div class='status' id='uploadStatus'></div>
+</div>
+<div class='modal-footer'>
+<button class='btn btn-secondary' onclick='closeUpload()'>Cancel</button>
+<button class='btn btn-primary' id='uploadBtn' onclick='doUpload()' disabled>Upload</button>
+</div>
+</div></div>
+<script>function $(i){return document.getElementById(i)}
+var currentPath='/',currentFile=null,isNewFile=false,cardSizeMB=0;
+function loadDir(path){currentPath=path;updateBreadcrumb();$('fileList').innerHTML='<li class="loading">Loading...</li>';
+fetch('/api/sdlist?path='+encodeURIComponent(path)).then(r=>r.json()).then(data=>{
+if(!data.success){showError(data.error);return;}if(data.cardSizeMB)cardSizeMB=data.cardSizeMB;updateAutoFormatLabel();renderFiles(data.files);
+}).catch(e=>showError('Load failed: '+e));}
+function updateAutoFormatLabel(){var sel=$('formatType');if(!sel)return;var o=sel.querySelector('option[value="auto"]');if(!o)return;
+var fmt=cardSizeMB>32768?'exFAT':cardSizeMB>2048?'FAT32':'FAT16';
+o.textContent='Auto ('+fmt+' for '+(cardSizeMB>=1024?(cardSizeMB/1024).toFixed(1)+' GB':cardSizeMB+' MB')+' card)';}
+function updateBreadcrumb(){var bc=$('breadcrumb'),parts=currentPath.split('/').filter(p=>p);
+var html='<a href="#" onclick="loadDir(\'/\');return false">/</a>',p='/';
+for(var i=0;i<parts.length;i++){p+='/'+parts[i];html+=' <a href="#" onclick="loadDir(\''+p+'\');return false">'+parts[i]+'</a>/';}bc.innerHTML=html;}
+function renderFiles(files){var list=$('fileList');if(!files||files.length===0){list.innerHTML='<li class="empty">No files</li>';return;}
+files.sort((a,b)=>{if(a.type!==b.type)return a.type==='dir'?-1:1;return a.name.localeCompare(b.name);});
+var html='';
+if(currentPath!=='/'){
+html+='<li class="file-item" onclick="goUp()"><span class="file-icon">&#128193;</span><span class="file-name">..</span><span class="file-size">Parent</span><span class="file-actions"></span></li>';
+}
+for(var i=0;i<files.length;i++){
+var f=files[i];
+var icon=f.type==='dir'?'&#128193;':'&#128196;';
+var size=f.type==='dir'?'--':formatSize(f.size);
+var actions='';
+if(f.type==='file'){
+if(isEditable(f.name)){actions+='<button class="btn btn-primary" onclick="editFile(\''+f.name+'\');event.stopPropagation()">Edit</button>';}
+actions+='<button class="btn btn-secondary" onclick="downloadFile(\''+f.name+'\');event.stopPropagation()">&#8595;</button>';
+actions+='<button class="btn btn-danger" onclick="deleteFile(\''+f.name+'\');event.stopPropagation()">&times;</button>';
+}else{
+actions+='<button class="btn btn-danger" onclick="deleteFile(\''+f.name+'\');event.stopPropagation()">&times;</button>';
+}
+html+='<li class="file-item" onclick="itemClick(\''+f.name+'\',\''+f.type+'\')"><span class="file-icon">'+icon+'</span><span class="file-name">'+f.name+'</span><span class="file-size">'+size+'</span><span class="file-actions">'+actions+'</span></li>';
+}
+list.innerHTML=html;
+}
+function goUp(){
+var parts=currentPath.split('/').filter(p=>p);
+parts.pop();
+loadDir('/'+parts.join('/'));
+}
+function itemClick(name,type){
+if(type==='dir'){
+var newPath=currentPath==='/'?'/'+name:currentPath+'/'+name;
+loadDir(newPath);
+}else if(isEditable(name)){
+editFile(name);
+}
+}
+function formatSize(bytes){
+if(bytes<1024)return bytes+' B';
+if(bytes<1048576)return(bytes/1024).toFixed(1)+' KB';
+return(bytes/1048576).toFixed(1)+' MB';
+}
+function isEditable(name){
+var ext=name.toLowerCase().split('.').pop();
+return['txt','html','htm','css','js','json','cfg','xml','md','log','csv','ini'].indexOf(ext)>=0;
+}
+function getFullPath(name){
+return currentPath==='/'?'/'+name:currentPath+'/'+name;
+}
+function editFile(name){currentFile=name;isNewFile=false;$('editorTitle').textContent='Edit: '+name;$('editorContent').value='Loading...';
+$('editorStatus').className='status';$('editorModal').classList.add('active');
+fetch('/api/sdread?path='+encodeURIComponent(getFullPath(name))).then(r=>r.json()).then(data=>{
+$('editorContent').value=data.success?data.content:'Error: '+data.error;}).catch(e=>{$('editorContent').value='Error: '+e;});}
+function saveFile(){var b=$('saveBtn'),st=$('editorStatus');b.disabled=true;b.textContent='Saving...';st.className='status';
+var path=isNewFile?'/'+currentFile:getFullPath(currentFile);
+fetch('/api/sdwrite',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:path,content:$('editorContent').value})})
+.then(r=>r.json()).then(data=>{b.disabled=false;b.textContent='Save';
+if(data.success){st.textContent='Saved ('+data.size+' bytes)';st.className='status success';setTimeout(()=>{closeEditor();loadDir(currentPath);},1000);}
+else{st.textContent='Error: '+data.error;st.className='status error';}
+}).catch(e=>{b.disabled=false;b.textContent='Save';st.textContent='Error: '+e;st.className='status error';});}
+function closeEditor(){$('editorModal').classList.remove('active');currentFile=null;}
+function downloadFile(name){location.href='/api/sddownload?path='+encodeURIComponent(getFullPath(name));}
+function deleteFile(name){if(!confirm('Delete "'+name+'"?'))return;
+fetch('/api/sddelete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:getFullPath(name)})})
+.then(r=>r.json()).then(data=>{if(data.success)loadDir(currentPath);else alert('Delete failed: '+data.error);}).catch(e=>alert('Delete failed: '+e));}
+function showNewFile(){$('newFileName').value='';$('newFileStatus').className='status';$('newFileModal').classList.add('active');$('newFileName').focus();}
+function closeNewFile(){$('newFileModal').classList.remove('active');}
+function createFile(){var name=$('newFileName').value.trim();if(!name){$('newFileStatus').textContent='Enter a filename';$('newFileStatus').className='status error';return;}
+closeNewFile();currentFile=name;isNewFile=true;$('editorTitle').textContent='New: '+name;$('editorContent').value='';$('editorStatus').className='status';$('editorModal').classList.add('active');}
+function confirmFormat(){$('formatStatus').className='status';$('formatModal').classList.add('active');}
+function closeFormat(){$('formatModal').classList.remove('active');}
+function doFormat(){var b=$('formatBtn'),ft=$('formatType').value,st=$('formatStatus');b.disabled=true;
+b.textContent=ft==='quick'?'Deleting files...':'Formatting...';st.className='status';st.textContent='';
+fetch('/api/sdformat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({confirm:true,type:ft})})
+.then(r=>r.json()).then(data=>{b.disabled=false;b.textContent='Format SD Card';
+if(data.success){st.textContent=data.message||'Done!';st.className='status success';setTimeout(()=>{closeFormat();loadDir('/');},2000);}
+else{st.textContent='Error: '+data.error;st.className='status error';}
+}).catch(e=>{b.disabled=false;b.textContent='Format SD Card';st.textContent='Error: '+e;st.className='status error';});}
+function showError(msg){$('fileList').innerHTML='<li class="empty" style="color:#fca5a5">Error: '+msg+'</li>';}
+function showUpload(){$('uploadFile').value='';$('uploadInfo').textContent='';$('uploadStatus').className='status';
+$('uploadProgress').style.display='none';$('uploadBar').style.width='0%';$('uploadBtn').disabled=true;$('uploadModal').classList.add('active');}
+function closeUpload(){$('uploadModal').classList.remove('active');}
+function fileSelected(){var f=$('uploadFile').files[0];if(f){$('uploadInfo').textContent=f.name+' ('+formatSize(f.size)+')';$('uploadBtn').disabled=false;}
+else{$('uploadInfo').textContent='';$('uploadBtn').disabled=true;}}
+function doUpload(){var f=$('uploadFile').files[0];if(!f)return;var b=$('uploadBtn'),st=$('uploadStatus'),prog=$('uploadProgress'),bar=$('uploadBar');
+b.disabled=true;b.textContent='Uploading...';prog.style.display='block';st.className='status';
+var fd=new FormData();fd.append('path',currentPath);fd.append('file',f);var xhr=new XMLHttpRequest();
+xhr.open('POST','/api/sdfileupload',true);xhr.upload.onprogress=function(e){if(e.lengthComputable)bar.style.width=(e.loaded/e.total*100)+'%';};
+xhr.onload=function(){b.disabled=false;b.textContent='Upload';try{var r=JSON.parse(xhr.responseText);
+if(r.success){st.textContent='Uploaded: '+r.filename+' ('+formatSize(r.size)+')';st.className='status success';setTimeout(()=>{closeUpload();loadDir(currentPath);},1200);}
+else{st.textContent='Error: '+r.error;st.className='status error';}}catch(e){st.textContent='Error: '+xhr.responseText;st.className='status error';}};
+xhr.onerror=function(){b.disabled=false;b.textContent='Upload';st.textContent='Upload failed';st.className='status error';};xhr.send(fd);}
+loadDir('/');
+</script>
+</body></html>

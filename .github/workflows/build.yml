@@ -1,0 +1,229 @@
+name: Build Firmware
+
+on:
+  push:
+    branches: [ main, master ]
+    paths-ignore:
+      - '*.md'
+      - '*.txt'
+      - 'docs/**'
+  pull_request:
+    branches: [ main, master ]
+  release:
+    types: [ published ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # ── Primary boards ──
+          - name: m4
+            fqbn: "adafruit:samd:adafruit_feather_m4"
+            core: "adafruit:samd"
+            ext: bin
+            output: Thermostat-M4-W5500
+          - name: m0
+            fqbn: "adafruit:samd:adafruit_feather_m0"
+            core: "adafruit:samd"
+            ext: bin
+            output: Thermostat-M0-WINC1500
+          - name: rp2040
+            fqbn: "rp2040:rp2040:adafruit_feather"
+            core: "rp2040:rp2040"
+            ext: uf2
+            output: Thermostat-RP2040-W5500
+          - name: esp32s2
+            fqbn: "esp32:esp32:adafruit_feather_esp32s2"
+            core: "esp32:esp32"
+            ext: bin
+            output: Thermostat-ESP32S2-WiFi
+          - name: esp32s3
+            fqbn: "esp32:esp32:adafruit_feather_esp32s3"
+            core: "esp32:esp32"
+            ext: bin
+            output: Thermostat-ESP32S3-WiFi
+
+          # ── Dual network boards (ESP32 + PoE FeatherWing) ──
+          - name: esp32s2dual
+            fqbn: "esp32:esp32:adafruit_feather_esp32s2"
+            core: "esp32:esp32"
+            ext: bin
+            output: Thermostat-ESP32S2-DualNet
+            extra_flags: "-DDUAL_NETWORK=1"
+          - name: esp32s3dual
+            fqbn: "esp32:esp32:adafruit_feather_esp32s3"
+            core: "esp32:esp32"
+            ext: bin
+            output: Thermostat-ESP32S3-DualNet
+            extra_flags: "-DDUAL_NETWORK=1"
+          - name: esp32v2dual
+            fqbn: "esp32:esp32:adafruit_feather_esp32_v2"
+            core: "esp32:esp32"
+            ext: bin
+            output: Thermostat-ESP32V2-DualNet
+            extra_flags: "-DDUAL_NETWORK=1"
+
+          # ── Optional ESP32 variants ──
+          - name: esp32v2
+            fqbn: "esp32:esp32:adafruit_feather_esp32_v2"
+            core: "esp32:esp32"
+            ext: bin
+            output: Thermostat-ESP32V2-WiFi
+          - name: esp32s2tft
+            fqbn: "esp32:esp32:adafruit_feather_esp32s2_tft"
+            core: "esp32:esp32"
+            ext: bin
+            output: Thermostat-ESP32S2TFT-WiFi
+          - name: esp32s3tft
+            fqbn: "esp32:esp32:adafruit_feather_esp32s3_tft"
+            core: "esp32:esp32"
+            ext: bin
+            output: Thermostat-ESP32S3TFT-WiFi
+
+          # ── Optional SAMD variants ──
+          - name: m4can
+            fqbn: "adafruit:samd:adafruit_feather_m4_can"
+            core: "adafruit:samd"
+            ext: bin
+            output: Thermostat-M4CAN-W5500
+          - name: m0express
+            fqbn: "adafruit:samd:adafruit_feather_m0_express"
+            core: "adafruit:samd"
+            ext: bin
+            output: Thermostat-M0Express-W5500
+
+          # ── Optional nRF52840 variants ──
+          - name: nrf52840
+            fqbn: "adafruit:nrf52:feather52840"
+            core: "adafruit:nrf52"
+            ext: zip
+            output: Thermostat-nRF52840-W5500
+          - name: nrf52840sense
+            fqbn: "adafruit:nrf52:feather52840sense"
+            core: "adafruit:nrf52"
+            ext: zip
+            output: Thermostat-nRF52840Sense-W5500
+
+          # ── Optional STM32 ──
+          - name: stm32f405
+            fqbn: "STMicroelectronics:stm32:GenF4:pnum=FEATHER_F405"
+            core: "STMicroelectronics:stm32"
+            ext: bin
+            output: Thermostat-STM32F405-W5500
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install arduino-cli
+        uses: arduino/setup-arduino-cli@v2
+
+      - name: Configure board manager URLs
+        run: |
+          arduino-cli config init --overwrite
+          arduino-cli config add board_manager.additional_urls \
+            https://adafruit.github.io/arduino-board-index/package_adafruit_index.json
+          arduino-cli config add board_manager.additional_urls \
+            https://github.com/earlephilhower/arduino-pico/releases/download/global/package_rp2040_index.json
+          arduino-cli config add board_manager.additional_urls \
+            https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli config add board_manager.additional_urls \
+            https://github.com/stm32duino/BoardManagerFiles/raw/main/package_stmicroelectronics_index.json
+
+      - name: Install board core (${{ matrix.core }})
+        run: |
+          arduino-cli core update-index
+          arduino-cli core install "${{ matrix.core }}"
+
+      - name: Install Adafruit nRF52 tools
+        if: matrix.core == 'adafruit:nrf52'
+        run: |
+          pip3 install adafruit-nrfutil
+
+      - name: Install libraries
+        run: |
+          arduino-cli lib install \
+            "Adafruit MAX31865 library" \
+            "pt100rtd" \
+            "Adafruit GFX Library" \
+            "Adafruit ILI9341" \
+            "Adafruit FT6206 Library" \
+            "Adafruit Unified Sensor" \
+            "Adafruit BME680 Library" \
+            "Adafruit BME280 Library" \
+            "ArduinoJson" \
+            "SdFat - Adafruit Fork" \
+            "Ethernet" \
+            "WiFi101" \
+            "ArduinoOTA"
+
+      - name: Patch pt100rtd for ESP32
+        if: startsWith(matrix.core, 'esp32')
+        run: |
+          LIB_PATH=$(arduino-cli config get directories.user)/libraries/pt100rtd
+          HEADER="$LIB_PATH/pt100rtd.h"
+          if [ -f "$HEADER" ] && ! grep -q "defined(ESP32)" "$HEADER"; then
+            sed -i 's/#if defined(__arm__)/#if defined(ESP32) || defined(ESP8266)\n  #include <pgmspace.h>\n#elif defined(__arm__)/' "$HEADER"
+            echo "Patched pt100rtd.h for ESP32"
+          else
+            echo "pt100rtd already patched or not found"
+          fi
+
+      - name: Compile ${{ matrix.output }}
+        run: |
+          EXTRA=""
+          if [ -n "${{ matrix.extra_flags }}" ]; then
+            EXTRA="--build-property compiler.cpp.extra_flags=${{ matrix.extra_flags }}"
+          fi
+          arduino-cli compile \
+            --fqbn "${{ matrix.fqbn }}" \
+            --build-path build \
+            --warnings default \
+            $EXTRA \
+            Thermostat.ino
+
+      - name: Collect binary
+        run: |
+          mkdir -p binaries
+          if [ "${{ matrix.ext }}" = "uf2" ]; then
+            cp build/*.uf2 "binaries/${{ matrix.output }}.${{ matrix.ext }}"
+          elif [ "${{ matrix.ext }}" = "zip" ]; then
+            cp build/*.zip "binaries/${{ matrix.output }}.${{ matrix.ext }}"
+          else
+            cp build/Thermostat.ino.bin "binaries/${{ matrix.output }}.${{ matrix.ext }}"
+          fi
+          ls -la binaries/
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.output }}
+          path: binaries/${{ matrix.output }}.${{ matrix.ext }}
+
+  # Combine all artifacts into a single release upload
+  release:
+    needs: build
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: binaries
+          merge-multiple: true
+
+      - name: List binaries
+        run: ls -la binaries/
+
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: binaries/*

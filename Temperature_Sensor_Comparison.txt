@@ -1,0 +1,1358 @@
+================================================================================
+         TEMPERATURE SENSOR COMPARISON FOR THERMOSTAT PROJECT
+================================================================================
+
+EXECUTIVE SUMMARY
+-----------------
+For a thermostat project, the choice of temperature sensor depends on your 
+priorities:
+
+  * Best Overall:      SHT31 or SHT40 - ±0.2-0.3°C accuracy, includes humidity
+  * Best Budget:       DS18B20 - ±0.5°C accuracy, 1-Wire, waterproof available
+  * Best Precision:    TMP117 - ±0.1°C medical-grade, NIST traceable
+  * Best Multi-Func:   BME280 - Temperature + humidity + pressure
+  * Avoid:             DHT11 (poor accuracy), DHT22 (unreliable)
+
+
+================================================================================
+                        DETAILED SENSOR COMPARISON
+================================================================================
+
+PREMIUM / HIGH-ACCURACY SENSORS
+-------------------------------
+┌───────────┬─────────┬────────────┬─────────┬────────┬────────┬───────┬────────────┐
+│ Sensor    │ Accuracy│ Range      │Interface│Humidity│Response│ Price │ Breadboard │
+├───────────┼─────────┼────────────┼─────────┼────────┼────────┼───────┼────────────┤
+│ PT100 RTD │ ±0.15°C │-200 to 850°│ SPI**   │ No     │ 21ms   │$15-25 │ Moderate   │
+│ K-Type TC │ ±1-2°C  │-200 to1350°│ SPI***  │ No     │ ~100ms │$10-20 │ Moderate   │
+│ TMP117    │ ±0.1°C  │-55 to 150°C│ I2C     │ No     │15-125ms│ $5-8  │ Easy*      │
+│ MCP9808   │ ±0.25°C │-40 to 125°C│ I2C     │ No     │ 30ms   │ $3-5  │ Easy*      │
+│ SHT45     │ ±0.1°C  │-40 to 125°C│ I2C     │±1.0% RH│ <10ms  │ $8-12 │ Easy*      │
+└───────────┴─────────┴────────────┴─────────┴────────┴────────┴───────┴────────────┘
+** PT100 requires MAX31865 amplifier board - ALREADY IMPLEMENTED in Thermostat.ino
+*** K-Type requires MAX31855 or MAX6675 amplifier board
+
+RECOMMENDED FOR THERMOSTATS
+---------------------------
+┌───────────┬─────────┬────────────┬─────────┬────────┬────────┬───────┬────────────┐
+│ Sensor    │ Accuracy│ Range      │Interface│Humidity│Response│ Price │ Breadboard │
+├───────────┼─────────┼────────────┼─────────┼────────┼────────┼───────┼────────────┤
+│ SHT31     │±0.2-0.3°│-40 to 125°C│ I2C     │ ±2% RH │ <10ms  │ $3-6  │ Easy*      │
+│ SHT40     │ ±0.2°C  │-40 to 125°C│ I2C     │±1.8% RH│ <10ms  │ $3-5  │ Easy*      │
+│ DS18B20   │ ±0.5°C  │-55 to 125°C│ 1-Wire  │ No     │ 750ms  │ $1-4  │ Very Easy  │
+│ Si7021    │ ±0.4°C  │-40 to 125°C│ I2C     │ ±3% RH │ 12ms   │ $3-5  │ Easy*      │
+│ HTU21D    │ ±0.3°C  │-40 to 125°C│ I2C     │ ±2% RH │ 50ms   │ $3-5  │ Easy*      │
+└───────────┴─────────┴────────────┴─────────┴────────┴────────┴───────┴────────────┘
+
+MULTI-FUNCTION ENVIRONMENTAL SENSORS
+------------------------------------
+┌───────────┬─────────┬────────────┬─────────┬────────┬────────┬───────┬────────────┐
+│ Sensor    │ Accuracy│ Range      │Interface│Humidity│Response│ Price │ Breadboard │
+├───────────┼─────────┼────────────┼─────────┼────────┼────────┼───────┼────────────┤
+│ BME280    │±0.5-1.0°│-40 to 85°C │ I2C/SPI │ ±3% RH │ Varies │ $3-8  │ Easy*      │
+│ BME680    │ ±1.0°C  │-40 to 85°C │ I2C/SPI │ ±3% RH │ Varies │$10-15 │ Easy*      │
+│ AHT20     │ ±0.3°C  │-40 to 85°C │ I2C     │ ±2% RH │ 75ms   │ $2-4  │ Easy*      │
+└───────────┴─────────┴────────────┴─────────┴────────┴────────┴───────┴────────────┘
+
+BUDGET / ENTRY-LEVEL SENSORS
+----------------------------
+┌───────────┬─────────┬────────────┬─────────┬────────┬────────┬───────┬────────────┐
+│ Sensor    │ Accuracy│ Range      │Interface│Humidity│Response│ Price │ Breadboard │
+├───────────┼─────────┼────────────┼─────────┼────────┼────────┼───────┼────────────┤
+│ DHT22     │ ±0.5°C  │-40 to 80°C │ 1-Wire* │±2-5% RH│ 2 sec  │ $3-6  │ Very Easy  │
+│ DHT11     │ ±2°C    │ 0 to 50°C  │ 1-Wire* │ ±5% RH │ 1 sec  │ $1-2  │ Very Easy  │
+└───────────┴─────────┴────────────┴─────────┴────────┴────────┴───────┴────────────┘
+* DHT sensors use proprietary protocol, not standard Dallas 1-Wire
+
+ANALOG SENSORS (Not Recommended for Digital Projects)
+-----------------------------------------------------
+┌───────────┬─────────┬────────────┬─────────┬────────┬────────┬───────┬────────────┐
+│ Sensor    │ Accuracy│ Range      │Interface│Humidity│Response│ Price │ Breadboard │
+├───────────┼─────────┼────────────┼─────────┼────────┼────────┼───────┼────────────┤
+│ TMP36     │ ±1-2°C  │-40 to 125°C│ Analog  │ No     │ Fast   │ $1-2  │ Very Easy  │
+│ LM35      │ ±0.5°C  │-55 to 150°C│ Analog  │ No     │ Fast   │ $1-2  │ Very Easy  │
+│ NTC 10K   │ ±0.2-1°C│-40 to 125°C│ Analog  │ No     │ <15 sec│ $0.50 │ Easy       │
+└───────────┴─────────┴────────────┴─────────┴────────┴────────┴───────┴────────────┘
+
+* "Easy" for I2C sensors assumes using a breakout board (Adafruit, SparkFun, etc.)
+  Raw chips require SMD soldering which is difficult/impossible for breadboards.
+
+
+================================================================================
+                          INTERFACE COMPARISON
+================================================================================
+
+I2C (Recommended)
+-----------------
+  Advantages:   Standard protocol, multiple devices on bus, bidirectional
+  Disadvantages: Limited cable length (~1m), possible address conflicts
+  Sensors:      SHT31, SHT40, BME280, TMP117, MCP9808, AHT20, Si7021, HTU21D
+
+1-Wire (Dallas)
+---------------
+  Advantages:   Single data pin, long cable runs (100m+), unique addressing
+  Disadvantages: Slower communication, requires 4.7kΩ pull-up resistor
+  Sensors:      DS18B20
+
+DHT Protocol
+------------
+  Advantages:   Single pin, simple wiring
+  Disadvantages: Proprietary, slow, timing-sensitive, unreliable
+  Sensors:      DHT11, DHT22, AM2302
+
+Analog
+------
+  Advantages:   Simple concept, fast response, no protocol overhead
+  Disadvantages: Susceptible to noise, limited by ADC resolution
+  Sensors:      TMP36, LM35, NTC thermistors
+
+SPI (for RTD/Thermocouple amplifiers)
+-------------------------------------
+  Advantages:   Fast communication, full-duplex, no address conflicts
+  Disadvantages: More wires (4+CS), shorter cable length than 1-Wire
+  Sensors:      PT100 (via MAX31865), K-Type thermocouple (via MAX31855/MAX6675)
+
+
+================================================================================
+                    PT100 RTD vs K-TYPE THERMOCOUPLE
+================================================================================
+
+Both PT100 RTDs and K-Type thermocouples require amplifier boards and offer
+wide temperature ranges, but they have very different characteristics:
+
+┌─────────────────────┬──────────────────────┬──────────────────────┐
+│ Characteristic      │ PT100 RTD            │ K-Type Thermocouple  │
+├─────────────────────┼──────────────────────┼──────────────────────┤
+│ Accuracy            │ ±0.15°C (excellent)  │ ±1-2°C (good)        │
+│ Temperature Range   │ -200°C to +850°C     │ -200°C to +1350°C    │
+│ Long-term Stability │ Excellent            │ Drifts over time     │
+│ Response Time       │ 21ms (fast)          │ ~100ms (moderate)    │
+│ Amplifier Board     │ MAX31865             │ MAX31855 or MAX6675  │
+│ Probe Cost          │ $5-15                │ $2-10                │
+│ Amplifier Cost      │ $10-15               │ $5-10                │
+│ Total System Cost   │ $15-30               │ $10-20               │
+│ Wiring Complexity   │ 2/3/4-wire options   │ 2-wire only          │
+│ Cold Junction Comp  │ Not required         │ Required (built-in)  │
+│ Self-Heating        │ Slight (milliwatts)  │ None                 │
+│ Linearity           │ Very linear          │ Non-linear (tables)  │
+│ Best For            │ Precision, HVAC      │ High temp, cooking   │
+└─────────────────────┴──────────────────────┴──────────────────────┘
+
+WHEN TO USE PT100 RTD:
+  - Precision temperature measurement (laboratory, medical, HVAC)
+  - Long-term monitoring where drift is unacceptable
+  - Applications requiring ±0.5°C or better accuracy
+  - Temperatures below 500°C
+
+WHEN TO USE K-TYPE THERMOCOUPLE:
+  - High temperature applications (ovens, kilns, furnaces >500°C)
+  - Cooking and food safety monitoring
+  - Applications where probe cost matters (disposable)
+  - Fast-changing temperatures where response time matters
+  - Harsh environments where probe may be damaged
+
+FOR HVAC THERMOSTATS:
+  Neither is ideal - both are overkill for typical 60-80°F room temperature.
+  PT100 is the better choice if you need wide range (e.g., outdoor sensor in
+  extreme climates), but for most thermostat applications, a simple I2C
+  sensor like SHT40 or TMP117 is more practical and cost-effective.
+
+
+================================================================================
+                      BREADBOARD WIRING GUIDE
+================================================================================
+
+WIRING DIFFICULTY RATINGS
+-------------------------
+  Very Easy  = 3 wires, no external components, through-hole package
+  Easy       = 4 wires (I2C), breakout board with headers
+  Moderate   = Requires external resistor or voltage divider
+  Difficult  = SMD package, requires adapter board or soldering skills
+
+DETAILED WIRING BY SENSOR
+-------------------------
+
+PT100 RTD + MAX31865 (Moderate) - 6 wires + amplifier board
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  Package:   PT100 probe (2/3/4-wire) + MAX31865 breakout board
+  Wiring:    MAX31865 to Arduino:
+               VIN ──── 5V (or 3.3V)
+               GND ──── GND
+               CLK ──── SCK (pin 13 on Uno)
+               SDO ──── MISO (pin 12 on Uno)
+               SDI ──── MOSI (pin 11 on Uno)
+               CS ───── Any digital pin (e.g., pin 10)
+             
+             PT100 to MAX31865 (3-wire example):
+               Red wire ──── F+ terminal
+               Red wire ──── Rref+ terminal (jumper both red wires)
+               Blue wire ─── RTD- terminal
+               Blue wire ─── F- terminal
+  
+  Notes:     - Must match board to sensor (PT100 vs PT1000)
+             - 3-wire is most common, provides wire compensation
+             - 4-wire provides best accuracy
+             - Solder jumpers on board configure 2/3/4-wire mode
+             - Price includes both probe (~$5-10) and amplifier (~$10-15)
+
+K-Type Thermocouple + MAX31855 (Moderate) - 5 wires + amplifier board
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  Package:   K-Type thermocouple probe + MAX31855 breakout board
+  Wiring:    MAX31855 to Arduino:
+               VIN ──── 3.3V (NOT 5V - chip is 3.3V only!)
+               GND ──── GND
+               CLK ──── SCK (pin 13 on Uno)
+               DO ───── MISO (pin 12 on Uno)
+               CS ───── Any digital pin (e.g., pin 10)
+             
+             K-Type probe to MAX31855:
+               Yellow wire (+) ──── + terminal
+               Red wire (-)    ──── - terminal
+  
+  Notes:     - MAX31855 is 3.3V only; use level shifter with 5V Arduinos
+             - MAX6675 is older alternative (also 3.3V, less accurate)
+             - Thermocouple polarity matters - check wire colors
+             - Built-in cold junction compensation
+             - K-Type color code: Yellow=+, Red=- (opposite of power!)
+             - Probe tip can be exposed (fast) or grounded (rugged)
+             - Adafruit library: Adafruit_MAX31855
+
+DS18B20 (Very Easy) - 3 wires + 1 resistor
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  Package:   TO-92 (through-hole) - fits directly in breadboard
+  Wiring:    VCC ──── 3.3V or 5V
+             GND ──── GND
+             DATA ─┬─ GPIO pin
+                   └─ 4.7kΩ to VCC (pull-up resistor)
+  
+  Notes:     - Waterproof probe version has pre-wired cable
+             - Multiple sensors can share one data pin
+             - Color codes: Red=VCC, Black=GND, Yellow/White=DATA
+
+DHT22 / DHT11 (Very Easy) - 3 wires, optional resistor
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  Package:   4-pin module (through-hole) - fits directly in breadboard
+  Wiring:    VCC ──── 3.3V or 5V
+             GND ──── GND
+             DATA ─┬─ GPIO pin
+                   └─ 10kΩ to VCC (often built into module)
+             NC ──── (not connected)
+  
+  Notes:     - Many modules have pull-up built in
+             - 3-pin modules exist with resistor integrated
+             - Minimum 2 seconds between reads
+
+TMP36 / LM35 (Very Easy) - 3 wires, no resistors
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  Package:   TO-92 (through-hole) - fits directly in breadboard
+  Wiring:    VCC ──── 5V (TMP36: 2.7-5.5V, LM35: 4-30V)
+             GND ──── GND
+             VOUT ─── Analog input pin
+  
+  Notes:     - Output: TMP36 = 10mV/°C + 500mV offset
+             - Output: LM35 = 10mV/°C, no offset
+             - Susceptible to noise - add 0.1µF cap if needed
+
+NTC 10K Thermistor (Easy) - 2 wires + voltage divider
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  Package:   2-pin (through-hole) - fits directly in breadboard
+  Wiring:    
+             VCC ────┬──── 10kΩ reference resistor
+                     │
+                     ├──── Analog input pin
+                     │
+             GND ────┴──── NTC thermistor
+  
+  Notes:     - Forms voltage divider with reference resistor
+             - Reference resistor should match NTC value at 25°C
+             - Non-linear output requires Steinhart-Hart equation
+
+I2C SENSORS (Easy with breakout board)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  Applies to: SHT31, SHT40, BME280, TMP117, MCP9808, AHT20, Si7021, HTU21D
+  
+  Package:   Breakout board with 0.1" headers (Adafruit, SparkFun, etc.)
+  Wiring:    VIN/VCC ── 3.3V or 5V (check board specs)
+             GND ────── GND
+             SDA ────── SDA (A4 on Uno, 20 on Mega, varies by board)
+             SCL ────── SCL (A5 on Uno, 21 on Mega, varies by board)
+  
+  Notes:     - Pull-up resistors usually included on breakout
+             - STEMMA QT / Qwiic connectors for solderless option
+             - Raw chips are SMD - NOT breadboard compatible!
+             - Multiple I2C devices can share same SDA/SCL lines
+
+WIRING SUMMARY TABLE
+--------------------
+┌───────────┬────────────┬───────┬──────────────┬──────────────────────────────┐
+│ Sensor    │ Difficulty │ Wires │ Extra Parts  │ Package                      │
+├───────────┼────────────┼───────┼──────────────┼──────────────────────────────┤
+│ PT100 RTD │ Moderate   │  6+   │ MAX31865 brd │ Probe + amplifier board      │
+│ K-Type TC │ Moderate   │   5   │ MAX31855 brd │ Probe + amplifier board      │
+│ DS18B20   │ Very Easy  │   3   │ 4.7kΩ resist │ TO-92 or waterproof probe    │
+│ DHT22     │ Very Easy  │   3   │ (built-in)   │ 4-pin module                 │
+│ DHT11     │ Very Easy  │   3   │ (built-in)   │ 4-pin module                 │
+│ TMP36     │ Very Easy  │   3   │ None         │ TO-92                        │
+│ LM35      │ Very Easy  │   3   │ None         │ TO-92                        │
+│ NTC 10K   │ Easy       │   2   │ 10kΩ resist  │ 2-pin through-hole           │
+│ SHT31     │ Easy*      │   4   │ None         │ Breakout board               │
+│ SHT40     │ Easy*      │   4   │ None         │ Breakout board               │
+│ BME280    │ Easy*      │   4   │ None         │ Breakout board               │
+│ TMP117    │ Easy*      │   4   │ None         │ Breakout board               │
+│ MCP9808   │ Easy*      │   4   │ None         │ Breakout board               │
+│ AHT20     │ Easy*      │   4   │ None         │ Breakout board               │
+│ Si7021    │ Easy*      │   4   │ None         │ Breakout board               │
+│ HTU21D    │ Easy*      │   4   │ None         │ Breakout board               │
+└───────────┴────────────┴───────┴──────────────┴──────────────────────────────┘
+* Requires breakout board - raw chips are surface-mount (SMD)
+
+RECOMMENDED FOR BREADBOARD PROTOTYPING
+--------------------------------------
+  Best:      DS18B20 (TO-92) - Plugs right in, one data wire + pull-up
+  Runner-up: DHT22 module - Plugs right in, often has pull-up built in
+  Best I2C:  Any Adafruit/SparkFun breakout with STEMMA QT/Qwiic connector
+
+
+================================================================================
+                         DETAILED SENSOR NOTES
+================================================================================
+
+PT100 RTD - Industrial Grade Precision (ALREADY IN PROJECT)
+------------------------------------------------------------
+  Status: Already implemented in Thermostat.ino with #ifdef PT100
+  Libs:   Adafruit_MAX31865, pt100rtd (lookup table for accuracy)
+  Config: 3-wire, CS pin 12
+  
+  Pros:  Exceptional accuracy (±0.15°C), very wide range (-200 to +850°C),
+         excellent long-term stability, industry standard, waterproof probes
+  Cons:  Requires MAX31865 amplifier board, more complex wiring (2/3/4-wire),
+         higher cost, SPI interface uses more pins
+  Use:   Industrial applications, scientific instruments, HVAC calibration,
+         food processing, when accuracy and stability are critical
+
+DS18B20 - Best Budget Option
+----------------------------
+  Pros:  Waterproof versions, multiple sensors on one bus, parasitic power
+  Cons:  Slow 750ms conversion, no humidity
+  Use:   Budget builds, remote/outdoor sensors, water temperature
+
+SHT31/SHT40 - Best Overall
+--------------------------
+  Pros:  Excellent accuracy, fast response, humidity included, stable
+  Cons:  Higher cost, single I2C address (SHT40)
+  Use:   Primary thermostat sensor, HVAC applications
+
+TMP117 - Best Precision
+-----------------------
+  Pros:  ±0.1°C accuracy, 16-bit resolution, NIST traceable, low power
+  Cons:  Higher cost, no humidity, overkill for most thermostats
+  Use:   Precision applications, calibration reference
+
+BME280 - Best Multi-Function
+----------------------------
+  Pros:  Three sensors in one (temp/humidity/pressure), I2C and SPI
+  Cons:  Self-heating affects temp by 1-2°C, many counterfeits
+  Use:   Weather stations, environmental monitoring
+
+DHT22 - Popular but Problematic
+-------------------------------
+  Pros:  Low cost, includes humidity, widely available
+  Cons:  2-second minimum between reads, prone to failures, quality varies
+  Use:   Learning projects only, NOT recommended for thermostats
+
+NTC 10K Thermistor - Traditional
+--------------------------------
+  Pros:  Very low cost, fast response, compatible with commercial HVAC
+  Cons:  Non-linear (needs Steinhart-Hart equation), noise sensitive
+  Use:   Compatibility with existing HVAC wiring
+
+
+================================================================================
+                      ARDUINO LIBRARY REQUIREMENTS
+================================================================================
+
+  Sensor          Library                         Install Command
+  --------------- ------------------------------- ---------------------------------
+  PT100/PT1000    Adafruit_MAX31865               (Library Manager)
+  DS18B20         DallasTemperature + OneWire     (Library Manager)
+  SHT31           Adafruit_SHT31                  (Library Manager)
+  SHT40/41/45     Adafruit_SHT4x                  (Library Manager)
+  BME280          Adafruit_BME280                 (Library Manager)
+  TMP117          Adafruit_TMP117                 (Library Manager)
+  DHT22/DHT11     DHT sensor library              (Library Manager)
+  AHT20           Adafruit_AHTX0                  (Library Manager)
+  Si7021          Adafruit_Si7021                 (Library Manager)
+  HTU21D          Adafruit_HTU21DF                (Library Manager)
+  MCP9808         Adafruit_MCP9808                (Library Manager)
+
+Note: Most Adafruit libraries also require "Adafruit Unified Sensor"
+
+
+================================================================================
+                      WHERE TO BUY - SOURCING GUIDE
+================================================================================
+
+PREMIUM SENSORS
+---------------
+
+PT100 RTD - ±0.15°C Industrial Precision (Wide Range)
+  Adafruit MAX31865 Kit: https://www.adafruit.com/product/3328  (~$14.95, amplifier only)
+  Adafruit PT100 Probe:  https://www.adafruit.com/product/3290  (~$9.95, 3-wire 1m cable)
+  Adafruit PT1000 Probe: https://www.adafruit.com/product/3984  (~$14.95, 3-wire 1m cable)
+  SparkFun MAX31865:     https://www.sparkfun.com/products/16770 (~$19.95)
+  Omega Engineering:     https://www.omega.com (industrial-grade probes, calibrated)
+  DigiKey (bare IC):     MAX31865ATP+ (search DigiKey)
+  Amazon/AliExpress:     Search "MAX31865" - clones $3-8 (quality varies)
+  Datasheet:             https://www.analog.com/en/products/max31865.html
+  Notes:                 Requires amplifier board + probe. 2/3/4-wire configurations.
+                         3-wire most common, 4-wire most accurate. Class A probes
+                         are more accurate than Class B. PT100 (100Ω) more common
+                         than PT1000 (1000Ω). Already implemented in Thermostat.ino.
+
+K-Type Thermocouple - ±1-2°C High Temperature
+  Adafruit MAX31855 Kit: https://www.adafruit.com/product/269   (~$14.95, amplifier only)
+  Adafruit K-Type Probe: https://www.adafruit.com/product/270   (~$9.95, glass braid)
+  Adafruit K-Type (long):https://www.adafruit.com/product/3245  (~$17.50, 2m stainless)
+  SparkFun MAX31855:     https://www.sparkfun.com/products/13266 (~$15.50)
+  Omega Engineering:     https://www.omega.com (industrial probes, many styles)
+  DigiKey (bare IC):     MAX31855KASA+ (search DigiKey)
+  Amazon/AliExpress:     Search "MAX31855" or "MAX6675" - clones $3-8
+  Datasheet:             https://www.analog.com/en/products/max31855.html
+  Notes:                 Requires amplifier board + probe. MAX31855 is 3.3V only!
+                         MAX6675 is older/cheaper alternative. K-Type good to 1350°C.
+                         Wire colors: Yellow=+, Red=- (opposite of power convention!)
+                         Probe styles: exposed tip (fast), grounded (rugged), ungrounded.
+
+TMP117 - ±0.1°C High Precision (NIST Traceable)
+  Adafruit Breakout:  https://www.adafruit.com/product/4821  (~$6.95)
+  DigiKey (bare IC):  TMP117AIDRVR (search DigiKey)
+  Datasheet:          https://www.ti.com/product/TMP117
+  Notes:              Breakout includes voltage regulator & level shifting
+                      for 3.3V/5V compatibility. STEMMA QT/Qwiic connectors.
+
+MCP9808 - ±0.25°C Precision
+  Adafruit Breakout:  https://www.adafruit.com/product/5027  (~$5.95, STEMMA QT)
+  Adafruit (original):https://www.adafruit.com/product/1782  (~$4.95)
+  DigiKey (bare IC):  MCP9808T-E/MS (search DigiKey)
+  Notes:              Up to 8 sensors on single I2C bus via address pins.
+                      2.7V-5.5V compatible.
+
+SHT45 - ±0.1°C Premium Temp+Humidity
+  Adafruit Breakout:  https://www.adafruit.com/product/5665  (~$12.50)
+  Adafruit w/PTFE:    https://www.adafruit.com/product/6174  (~$13.50)
+  DigiKey (bare IC):  SHT45-AD1B-R2 (search DigiKey)
+  Notes:              ISO 17025 calibration certificate, NIST traceable.
+                      PTFE filter version for dusty environments.
+
+
+RECOMMENDED FOR THERMOSTATS
+---------------------------
+
+SHT31 - ±0.2-0.3°C with Humidity (Best Overall Value)
+  Adafruit Breakout:  https://www.adafruit.com/product/2857  (~$5.95)
+  DigiKey (bare IC):  SHT31-DIS-B2.5KS (~$4.00)
+  DigiKey product:    https://www.digikey.com/en/products/detail/sensirion-ag/SHT31-DIS-B2-5KS/5872252
+  Notes:              STEMMA QT compatible. Two I2C addresses available (0x44/0x45).
+                      PTFE filter version available for protection.
+
+SHT40 - ±0.2°C Budget Sensirion Option
+  Adafruit Breakout:  https://www.adafruit.com/product/4885  (~$5.95)
+  DigiKey (bare IC):  SHT40-AD1B-R2 (search DigiKey)
+  Notes:              Same form factor as SHT45, identical code.
+                      STEMMA QT/Qwiic connectors.
+
+DS18B20 - ±0.5°C (Best Budget, Long Runs)
+  Adafruit Waterproof: https://www.adafruit.com/product/381   (~$9.95, 1m PVC cable)
+  Adafruit High-Temp:  https://www.adafruit.com/product/642   (~$9.95, PTFE cable)
+  Adafruit 3m Cable:   https://www.adafruit.com/product/3846  (~$12.95)
+  DigiKey (bare TO-92): DS18B20+ (~$6.59) - NOTE: Original Maxim part obsolete,
+                        EVVO clone DS18B20-EV available (~$2.40)
+  Notes:              Waterproof versions ideal for HVAC. 1-Wire allows 100m+ cable runs.
+                      Each sensor has unique 64-bit ID for multi-sensor setups.
+                      Requires 4.7kΩ pull-up resistor (included with Adafruit).
+
+BME280 - Temperature + Humidity + Pressure (Multi-Function)
+  Adafruit Breakout:  https://www.adafruit.com/product/2652  (~$12.95)
+  DigiKey (bare IC):  BME280 (search DigiKey, SMD package)
+  Notes:              Great for weather stations. ±1.0°C temp, ±3% humidity,
+                      ±1 hPa pressure. Can calculate altitude. I2C or SPI.
+                      Caution: Self-heating can affect readings by 1-2°C.
+
+
+GENERAL NOTES
+-------------
+• Adafruit breakout boards include voltage regulators, level shifters, and 
+  pull-up resistors - ready to use with 3.3V or 5V microcontrollers
+• STEMMA QT / Qwiic connectors allow solderless connections
+• DigiKey bare ICs are SMD packages requiring custom PCB or adapter boards
+• For prototyping, Adafruit breakouts are recommended for ease of use
+• For production, DigiKey bare ICs offer lower per-unit cost
+
+
+SUPPLIER DIRECTORY
+------------------
+
+HOBBYIST / MAKER SUPPLIERS (Breakout boards, tutorials, good documentation)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  Adafruit Industries     https://www.adafruit.com
+                          - Excellent tutorials, Arduino libraries, STEMMA QT ecosystem
+                          - Higher prices but great documentation and support
+                          - Ships from NYC, fast US delivery
+
+  SparkFun Electronics    https://www.sparkfun.com
+                          - Similar to Adafruit, Qwiic connector ecosystem
+                          - Good tutorials, Arduino libraries
+                          - Ships from Colorado
+
+  Pololu                  https://www.pololu.com
+                          - Good selection of breakout boards
+                          - Competitive prices, less documentation than Adafruit
+                          - Ships from Nevada
+
+  Pimoroni                https://shop.pimoroni.com
+                          - UK-based, good for European customers
+                          - Raspberry Pi focused but carries many sensors
+                          - Ships worldwide
+
+  Seeed Studio            https://www.seeedstudio.com
+                          - Grove connector ecosystem
+                          - Good prices, ships from China (slow) or US warehouse
+                          - Wide selection of sensors and modules
+
+
+ELECTRONIC COMPONENT DISTRIBUTORS (Bare ICs, production quantities)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  DigiKey                 https://www.digikey.com
+                          - Massive selection, detailed datasheets
+                          - Fast shipping, no minimum order
+                          - Best for finding specific part numbers
+
+  Mouser Electronics      https://www.mouser.com
+                          - Similar to DigiKey, good alternative
+                          - Strong international shipping
+                          - Detailed parametric search
+
+  Newark / element14      https://www.newark.com (US) / https://www.element14.com
+                          - Part of Farnell group
+                          - Good for industrial/professional buyers
+                          - Strong in UK/Europe
+
+  Arrow Electronics       https://www.arrow.com
+                          - Large distributor, good prices on volume
+                          - Free samples available for some parts
+
+
+BUDGET / CLONE SOURCES (Cheap but quality varies)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  Amazon                  https://www.amazon.com
+                          - Fast shipping with Prime
+                          - Quality varies wildly - read reviews carefully
+                          - Good for DS18B20, DHT22, generic breakouts
+                          - Watch for counterfeits on popular sensors
+
+  AliExpress              https://www.aliexpress.com
+                          - Lowest prices, ships from China (2-4 weeks)
+                          - Quality inconsistent, buy from high-rated sellers
+                          - Good for bulk purchases, prototyping
+                          - Many clones/counterfeits - caveat emptor
+
+  eBay                    https://www.ebay.com
+                          - Mix of US and China sellers
+                          - Good for finding discontinued parts
+                          - Check seller ratings and location
+
+  Banggood                https://www.banggood.com
+                          - Similar to AliExpress, China-based
+                          - Sometimes has US warehouse stock
+
+
+SPECIALTY SUPPLIERS
+~~~~~~~~~~~~~~~~~~~
+  Omega Engineering       https://www.omega.com
+                          - Industrial-grade temperature sensors
+                          - PT100 probes, thermocouples, transmitters
+                          - Higher prices but calibrated, certified sensors
+
+  TE Connectivity         https://www.te.com
+                          - Manufacturer of many sensor elements
+                          - NTC thermistors, RTD elements
+                          - Technical datasheets and application notes
+
+  Sensirion (Direct)      https://www.sensirion.com
+                          - Manufacturer of SHT series (SHT31, SHT40, SHT45)
+                          - Evaluation kits, technical documentation
+                          - Usually buy through distributors
+
+  Maxim Integrated        https://www.maximintegrated.com (now part of Analog Devices)
+                          - Manufacturer of DS18B20, MAX31865, MAX31855
+                          - Datasheets, application notes, reference designs
+
+
+AMPLIFIER BOARDS FOR RTD/THERMOCOUPLE
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  MAX31865 (PT100 RTD):
+    Adafruit              https://www.adafruit.com/product/3328  (~$14.95)
+    SparkFun              https://www.sparkfun.com/products/16770 (~$19.95)
+    Amazon/AliExpress     Search "MAX31865" - clones $3-8 (quality varies)
+
+  MAX31855 (K-Type Thermocouple):
+    Adafruit              https://www.adafruit.com/product/269   (~$14.95)
+    SparkFun              https://www.sparkfun.com/products/13266 (~$15.50)
+    Amazon/AliExpress     Search "MAX31855" - clones $3-6 (quality varies)
+
+  MAX6675 (K-Type, older/cheaper):
+    Amazon/AliExpress     Search "MAX6675" - typically $2-5
+    Note: Less accurate than MAX31855, but adequate for many applications
+
+
+PRICE COMPARISON TIPS
+~~~~~~~~~~~~~~~~~~~~~
+• Adafruit/SparkFun: Pay premium for documentation, libraries, support
+• DigiKey/Mouser: Best for specific part numbers, production quantities
+• Amazon: Fast shipping, mid-range prices, check reviews carefully
+• AliExpress: Cheapest, slow shipping, quality lottery
+• For critical applications: Buy from authorized distributors to avoid counterfeits
+• For prototyping: Clone boards are usually fine, verify with known-good reference
+
+
+================================================================================
+                EXTREME WEATHER OUTDOOR THERMOSTAT CONSIDERATIONS
+================================================================================
+
+Target Range: -60°F to +120°F (-51°C to +49°C)
+Windchill:    -140°F (-96°C) survivability
+Total Swing:  180°F (100°C)
+
+TEMPERATURE RANGE SUMMARY
+-------------------------
+┌───────────────┬─────────────────┬─────────────────┬──────────┬──────────┐
+│ Sensor        │ Operating Range │ Temp+Hum+Press? │ Interface│ Verdict  │
+├───────────────┼─────────────────┼─────────────────┼──────────┼──────────┤
+│ PT100 RTD     │-200°C to +850°C │ Temp only       │ SPI      │ BEST     │
+│               │(-328°F to+1562°F│                 │          │          │
+├───────────────┼─────────────────┼─────────────────┼──────────┼──────────┤
+│ DS18B20       │ -55°C to +125°C │ Temp only       │ 1-Wire   │ GOOD     │
+│               │ (-67°F to+257°F)│                 │          │(cold end)│
+├───────────────┼─────────────────┼─────────────────┼──────────┼──────────┤
+│ TMP117        │ -55°C to +150°C │ Temp only       │ I2C      │ GOOD     │
+│               │ (-67°F to+302°F)│                 │          │(cold end)│
+├───────────────┼─────────────────┼─────────────────┼──────────┼──────────┤
+│ SHT31/40/45   │ -40°C to +125°C │ Temp + Humidity │ I2C      │ NO       │
+│               │ (-40°F to+257°F)│                 │          │(too warm)│
+├───────────────┼─────────────────┼─────────────────┼──────────┼──────────┤
+│ BME280        │ -40°C to +85°C  │ Temp+Hum+Press  │ I2C/SPI  │ NO       │
+│               │ (-40°F to+185°F)│                 │          │(too warm)│
+├───────────────┼─────────────────┼─────────────────┼──────────┼──────────┤
+│ MCP9808       │ -40°C to +125°C │ Temp only       │ I2C      │ NO       │
+│               │ (-40°F to+257°F)│                 │          │(too warm)│
+└───────────────┴─────────────────┴─────────────────┴──────────┴──────────┘
+
+Your range: -60°F to +120°F = -51°C to +49°C
+
+SENSOR MARGIN ANALYSIS
+----------------------
+                        Cold End (-51°C)              Hot End (+49°C)
+┌───────────────┬──────────────────────────┬──────────────────────────┐
+│ Sensor        │ Margin from -51°C        │ Margin from +49°C        │
+├───────────────┼──────────────────────────┼──────────────────────────┤
+│ PT100 RTD     │ +149°C headroom ✓✓✓      │ +801°C headroom ✓✓✓      │
+│ DS18B20       │ +4°C marginal ⚠          │ +76°C plenty ✓✓          │
+│ TMP117        │ +4°C marginal ⚠          │ +101°C plenty ✓✓         │
+│ SHT31/40/45   │ -11°C OUT OF SPEC ✗      │ +76°C plenty ✓✓          │
+│ BME280        │ -11°C OUT OF SPEC ✗      │ +36°C OK ✓               │
+│ MCP9808       │ -11°C OUT OF SPEC ✗      │ +76°C plenty ✓✓          │
+└───────────────┴──────────────────────────┴──────────────────────────┘
+
+
+RECOMMENDATIONS FOR FULL RANGE (-60°F to +120°F)
+------------------------------------------------
+
+PRIMARY CHOICE: PT100 RTD (Already in your project!)
+  - Operating range: -200°C to +850°C (-328°F to +1562°F)
+  - Your entire range is a tiny fraction of its capability
+  - Accuracy: ±0.15°C consistent across the full range
+  - Industrial standard for harsh environments
+  - No concerns at either temperature extreme
+  - Waterproof stainless steel probes handle sun exposure
+
+BACKUP/VERIFICATION: DS18B20 or TMP117
+  - Both cover -55°C to +125°C (or higher for TMP117)
+  - Cold end (-51°C) is close to limit - only 4°C margin
+  - Hot end (+49°C) has plenty of headroom
+  - Good for redundancy / cross-checking PT100
+  - DS18B20 waterproof probes work well outdoors
+  - TMP117 has better accuracy (±0.1°C) but needs protection
+
+NOT RECOMMENDED FOR PRIMARY: SHT3x, SHT4x, BME280, MCP9808
+  - All have -40°C (-40°F) minimum operating temperature
+  - Your -60°F target is 11°C BELOW their rated minimum
+  - Hot end is fine for all of them
+  - Still useful in heated enclosure for humidity/pressure
+
+
+ADDING HUMIDITY + PRESSURE FOR OUTDOOR WEATHER STATION
+------------------------------------------------------
+
+Since no single sensor covers your temp range WITH humidity/pressure,
+use a MULTI-SENSOR approach:
+
+  1. PT100 RTD - Primary temperature (full range capable)
+  2. BME280 - Humidity + Pressure (needs thermal management)
+
+THERMAL MANAGEMENT STRATEGY:
+  The BME280 operates from -40°C to +85°C (-40°F to +185°F).
+  Your range exceeds this on the COLD end only.
+  
+  For COLD conditions (below -40°F):
+    - Small heater in enclosure keeps BME280 above -40°C
+    - PT100 probe measures true outdoor temp
+    
+  For HOT conditions (up to +120°F / 49°C):
+    - BME280's +85°C max is fine - you have 36°C headroom
+    - Provide shade/ventilation to prevent solar heating
+    - White enclosure reflects heat
+    - Avoid placing in direct sun on dark surfaces
+
+  Barometric pressure note:
+    - Pressure readings are less affected by sensor temperature
+    - Properly vented enclosure allows accurate pressure sensing
+    - Humidity accuracy depends on air exchange with outside
+
+
+ENCLOSURE CONSIDERATIONS BY SEASON
+----------------------------------
+
+WINTER (-60°F / -51°C):
+  ┌─────────────────────────────────────────┐
+  │  ┌─────────────┐                        │
+  │  │ Small       │  Keep electronics      │
+  │  │ Heater      │  above -40°C           │
+  │  │ (5-10W)     │                        │
+  │  └─────────────┘                        │
+  │  ┌─────────────┐  ┌─────────────┐       │
+  │  │  MAX31865   │  │   BME280    │       │
+  │  │  + MCU      │  │ (hum+press) │       │
+  │  └─────────────┘  └─────────────┘       │
+  │         ↑                               │
+  │    PT100 probe extends outside          │
+  │    (PTFE cable, waterproof)             │
+  └─────────────────────────────────────────┘
+
+SUMMER (+120°F / +49°C):
+  ┌─────────────────────────────────────────┐
+  │     WHITE OR REFLECTIVE ENCLOSURE       │
+  │     (radiation shield / Stevenson screen)│
+  │                                         │
+  │  ┌─────────────┐  ┌─────────────┐       │
+  │  │  MAX31865   │  │   BME280    │       │
+  │  │  + MCU      │  │ (hum+press) │       │
+  │  └─────────────┘  └─────────────┘       │
+  │         ↑              ↑                │
+  │    PT100 probe    Vent holes for        │
+  │    in shade       air circulation       │
+  │                                         │
+  │     ═══════════════════════════         │
+  │        Louvered vents for airflow       │
+  └─────────────────────────────────────────┘
+
+Consider a commercial weather station radiation shield (Stevenson screen
+style) that provides shade while allowing air circulation. These are
+available from Davis Instruments, Ambient Weather, etc.
+
+
+================================================================================
+                    3D PRINTED ENCLOSURE FILAMENT SELECTION
+================================================================================
+
+Target Operating Range: -60°F to +120°F (-51°C to +49°C)
+
+FILAMENT COMPARISON
+-------------------
+┌─────────────┬─────────────┬─────────────┬─────────────┬─────────────┐
+│ Filament    │ Glass Trans │ UV Resist   │ Cold Perf   │ Verdict     │
+│             │ Temp (Tg)   │             │             │             │
+├─────────────┼─────────────┼─────────────┼─────────────┼─────────────┤
+│ ASA         │ 100-105°C   │ Excellent   │ Stable in   │ BEST CHOICE │
+│             │ (212-221°F) │ (10x ABS)   │ freezing    │             │
+├─────────────┼─────────────┼─────────────┼─────────────┼─────────────┤
+│ ABS         │ 105°C       │ Poor        │ OK but UV   │ Avoid       │
+│             │ (221°F)     │ (yellows)   │ degrades it │             │
+├─────────────┼─────────────┼─────────────┼─────────────┼─────────────┤
+│ PETG        │ 77-80°C     │ Moderate    │ Flexible,   │ Hot end     │
+│             │ (170-176°F) │             │ handles OK  │ marginal    │
+├─────────────┼─────────────┼─────────────┼─────────────┼─────────────┤
+│ PLA         │ 60°C        │ Poor        │ Very        │ NO          │
+│             │ (140°F)     │             │ brittle     │             │
+├─────────────┼─────────────┼─────────────┼─────────────┼─────────────┤
+│ Polycarb    │ 147-150°C   │ Poor        │ Brittle at  │ NO          │
+│ (PC)        │ (300°F)     │ (degrades)  │ -40°F       │             │
+└─────────────┴─────────────┴─────────────┴─────────────┴─────────────┘
+
+WHY ASA IS THE BEST CHOICE
+--------------------------
+Heat Resistance:
+  - Tg of ~100-105°C means +120°F (+49°C) is no problem
+  - You have 56°C of headroom on the hot end
+  - Won't soften in direct summer sun
+
+Cold Performance:
+  - Remains structurally stable in freezing temperatures
+  - Better than PLA (becomes extremely brittle below 0°C)
+  - Acrylic component provides flexibility vs. polycarbonate
+
+UV/Weather Resistance:
+  - 10x more UV resistant than ABS
+  - Won't yellow, crack, or lose strength in sunlight
+  - Resists moisture - important for rain/snow/humidity cycles
+
+Dimensional Stability:
+  - Won't warp or shrink with temperature swings
+  - Maintains shape over years of outdoor exposure
+
+
+ASA FILAMENT SOURCING
+---------------------
+┌─────────────────┬──────────┬─────────────────────────────────────────┐
+│ Brand           │ Price/kg │ Where to Buy                            │
+├─────────────────┼──────────┼─────────────────────────────────────────┤
+│ Prusament ASA   │ ~$30-35  │ https://www.prusa3d.com/product/        │
+│                 │          │   prusament-asa-prusa-orange-850g/      │
+│                 │          │ (850g spool due to lower density)       │
+├─────────────────┼──────────┼─────────────────────────────────────────┤
+│ Polymaker ASA   │ ~$25-30  │ https://us.polymaker.com/products/      │
+│                 │          │   polymaker-asa                         │
+│                 │          │ Amazon: search "Polymaker ASA"          │
+├─────────────────┼──────────┼─────────────────────────────────────────┤
+│ Sunlu ASA       │ ~$20-25  │ Amazon: search "Sunlu ASA"              │
+│                 │          │ https://www.sunlu.com                   │
+│                 │          │ Budget option, less warping than ABS    │
+├─────────────────┼──────────┼─────────────────────────────────────────┤
+│ eSun ASA+       │ ~$22-28  │ Amazon: search "eSun ASA+"              │
+│                 │          │ Good reviews for outdoor use            │
+├─────────────────┼──────────┼─────────────────────────────────────────┤
+│ Hatchbox ASA    │ ~$28-32  │ Amazon: search "Hatchbox ASA"           │
+│                 │          │ Reliable quality, good availability     │
+└─────────────────┴──────────┴─────────────────────────────────────────┘
+
+Note: Prices as of late 2025, subject to change. Amazon often has
+best prices and Prime shipping for US customers.
+
+
+ASA PRINTING REQUIREMENTS
+-------------------------
+  - Enclosed printer (or DIY enclosure) - ASA warps without it
+  - Heated bed: 90-110°C
+  - Nozzle temp: 240-260°C  
+  - Ventilation required - ASA emits styrene fumes
+  - Keep filament dry - store with desiccant
+  - Print speed: 30-50 mm/s for best results
+  - Part cooling fan: OFF or minimal
+
+
+ENCLOSURE DESIGN TIPS FOR EXTREME WEATHER
+-----------------------------------------
+  - Wall thickness: 2-3mm minimum for thermal mass
+  - Infill: 40-60% for structural parts
+  - Color: WHITE or LIGHT GRAY to reflect summer heat
+  - Drainage: Small holes at bottom for condensation
+  - Gaskets: Consider TPU gaskets for sealing (also temp-stable)
+  - Vents: Louvered design for humidity sensing if needed
+  - Test: Prototype and freeze at -60°F overnight, then drop test
+
+
+================================================================================
+                    BME280 COLD WEATHER OPERATING STRATEGY
+================================================================================
+
+BME280 TEMPERATURE SPECIFICATIONS
+---------------------------------
+Operating Range:  -40°C to +85°C  (-40°F to +185°F)
+Storage Range:    -40°C to +85°C  (-40°F to +185°F)  [same as operating]
+Your Cold Extreme: -51°C (-60°F)
+
+STORAGE vs OPERATING: The BME280 datasheet shows the same temperature range
+for both operating and storage (-40°C to +85°C). This means:
+  - When POWERED OFF, the sensor should NOT be exposed below -40°C
+  - There is no "safe unpowered storage" range below operating temp
+  - The sensor could be damaged by extreme cold even when off
+
+RECOMMENDATION: Power down at -30°F (-34°C) to provide safety margin
+  - Gives 6°C (11°F) margin above the -40°C limit
+  - Accounts for sensor self-heating when powered (keeps it warmer)
+  - At -30°F, humidity data is mostly meaningless anyway ("too cold to snow")
+
+"TOO COLD TO SNOW" THRESHOLD
+----------------------------
+At approximately -22°F (-30°C), the air holds so little moisture that
+significant snowfall becomes unlikely. Below this point:
+  - Relative humidity readings become less meaningful
+  - Absolute humidity is extremely low regardless of RH%
+  - Weather is dominated by temperature, not humidity
+  - Any precipitation would be light ice crystals, not snow
+
+Power-down at -30°F means you lose humidity data right around when it
+stops being useful anyway — a reasonable engineering tradeoff.
+
+
+WEB INTERFACE DISPLAY: HUMIDITY
+-------------------------------
+Display humidity as a percentage (%) — this is the standard format.
+
+Example web interface display:
+  ┌────────────────────────────────────────┐
+  │  OUTDOOR CONDITIONS                    │
+  │  ─────────────────────────────────────│
+  │  Temperature:  45°F                    │
+  │  Humidity:     62%                     │
+  │  Pressure:     29.92 inHg  ↑ RISING   │
+  │  Trend:        Fair weather expected   │
+  └────────────────────────────────────────┘
+
+When BME280 is disabled (below -30°F):
+  ┌────────────────────────────────────────┐
+  │  OUTDOOR CONDITIONS                    │
+  │  ─────────────────────────────────────│
+  │  Temperature:  -35°F                   │
+  │  Humidity:     N/A (sensor disabled)   │
+  │  Pressure:     N/A (sensor disabled)   │
+  │  Note: Too cold for BME280 operation   │
+  └────────────────────────────────────────┘
+
+
+WEB INTERFACE DISPLAY: BAROMETRIC PRESSURE
+------------------------------------------
+In the USA, barometric pressure is typically displayed in:
+
+  INCHES OF MERCURY (inHg) — Standard US unit
+  
+  Reference values:
+    29.92 inHg = Standard sea level pressure (1013.25 hPa)
+    30.20 inHg = High pressure (fair weather)
+    29.80 inHg = Low pressure (unsettled)
+
+The BME280 outputs pressure in Pascals (Pa) or hectopascals (hPa).
+Conversion: inHg = hPa × 0.02953
+
+Arduino code example:
+  ┌─────────────────────────────────────────────────────────────────┐
+  │  float pressure_hPa = bme.readPressure() / 100.0F;  // Pa→hPa  │
+  │  float pressure_inHg = pressure_hPa * 0.02953;      // hPa→inHg│
+  │                                                                 │
+  │  // Display with 2 decimal places                              │
+  │  Serial.print(pressure_inHg, 2);                               │
+  │  Serial.println(" inHg");                                      │
+  └─────────────────────────────────────────────────────────────────┘
+
+
+WEATHER PREDICTION FROM BAROMETRIC PRESSURE
+-------------------------------------------
+The TREND (rising/falling) matters more than the absolute value!
+
+Track pressure over time and calculate 3-hour change:
+
+  ┌──────────────────┬────────────────────────────────────────────┐
+  │ Pressure Trend   │ Weather Prediction                         │
+  ├──────────────────┼────────────────────────────────────────────┤
+  │ Rising (steady)  │ Fair weather, clearing skies               │
+  │ Rising (rapid)   │ Fair weather, but may not last long        │
+  │ Steady           │ No significant change expected             │
+  │ Falling (slow)   │ Weather changing, possible precipitation   │
+  │ Falling (rapid)  │ Storm approaching within 12-24 hours       │
+  │ Falling < 29.80  │ Storm likely within 24 hours               │
+  └──────────────────┴────────────────────────────────────────────┘
+
+  Rapid change = 0.06 inHg/hour or more (per NOAA definition)
+  Slow change  = less than 0.06 inHg/hour
+
+Pressure thresholds for weather prediction:
+  > 30.20 inHg : High pressure — expect fair, dry weather
+  30.00-30.20  : Normal — stable conditions
+  29.80-30.00  : Changeable — watch for trends
+  < 29.80 inHg : Low pressure — precipitation likely
+  < 29.50 inHg : Very low — storm conditions
+
+
+FIRMWARE: PRESSURE TREND TRACKING
+---------------------------------
+Store readings and calculate trend for web display:
+
+  ┌─────────────────────────────────────────────────────────────────┐
+  │  #define PRESSURE_HISTORY_SIZE  12  // 3 hours at 15-min intervals│
+  │  #define READING_INTERVAL_MS    (15 * 60 * 1000)  // 15 minutes │
+  │                                                                 │
+  │  float pressure_history[PRESSURE_HISTORY_SIZE];                 │
+  │  int pressure_index = 0;                                        │
+  │  bool history_full = false;                                     │
+  │                                                                 │
+  │  void recordPressure(float current_inHg) {                      │
+  │      pressure_history[pressure_index] = current_inHg;           │
+  │      pressure_index = (pressure_index + 1) % PRESSURE_HISTORY_SIZE;│
+  │      if (pressure_index == 0) history_full = true;              │
+  │  }                                                              │
+  │                                                                 │
+  │  // Returns: positive=rising, negative=falling, 0=steady        │
+  │  float getPressureTrend3hr() {                                  │
+  │      if (!history_full) return 0;  // Not enough data yet       │
+  │      int oldest = pressure_index;  // Oldest is at current index│
+  │      int newest = (pressure_index - 1 + PRESSURE_HISTORY_SIZE)  │
+  │                   % PRESSURE_HISTORY_SIZE;                      │
+  │      return pressure_history[newest] - pressure_history[oldest];│
+  │  }                                                              │
+  │                                                                 │
+  │  const char* getTrendText(float trend) {                        │
+  │      if (trend > 0.18)  return "Rising Rapidly";                │
+  │      if (trend > 0.06)  return "Rising";                        │
+  │      if (trend > -0.06) return "Steady";                        │
+  │      if (trend > -0.18) return "Falling";                       │
+  │      return "Falling Rapidly";                                  │
+  │  }                                                              │
+  │                                                                 │
+  │  const char* getWeatherForecast(float pressure, float trend) {  │
+  │      if (trend < -0.18 && pressure < 29.80)                     │
+  │          return "Storm likely within 12-24 hours";              │
+  │      if (trend < -0.06)                                         │
+  │          return "Precipitation possible";                       │
+  │      if (trend > 0.06 && pressure > 30.00)                      │
+  │          return "Fair weather expected";                        │
+  │      if (pressure > 30.20)                                      │
+  │          return "Clear and dry";                                │
+  │      if (pressure < 29.80)                                      │
+  │          return "Unsettled conditions";                         │
+  │      return "No significant change";                            │
+  │  }                                                              │
+  └─────────────────────────────────────────────────────────────────┘
+
+
+WEB INTERFACE HTML/JSON EXAMPLE
+-------------------------------
+JSON response from Arduino web server:
+
+  {
+    "outdoor_temp_f": 45.2,
+    "humidity_pct": 62,
+    "pressure_inHg": 29.92,
+    "pressure_trend": 0.08,
+    "trend_text": "Rising",
+    "forecast": "Fair weather expected",
+    "bme280_enabled": true
+  }
+
+When BME280 is disabled:
+
+  {
+    "outdoor_temp_f": -35.4,
+    "humidity_pct": null,
+    "pressure_inHg": null,
+    "pressure_trend": null,
+    "trend_text": "N/A",
+    "forecast": "Sensor disabled (too cold)",
+    "bme280_enabled": false
+  }
+
+
+ALTITUDE COMPENSATION NOTE
+--------------------------
+The BME280 measures ABSOLUTE pressure, not sea-level adjusted pressure.
+For accurate weather prediction, you should compensate for altitude:
+
+  Sea Level Pressure = Measured Pressure × (1 - (altitude_m × 0.0000225577))^(-5.25588)
+  
+Or use a simpler approximation:
+  - Pressure drops ~1 inHg per 1000 feet of elevation
+  - If you're at 1500 feet, add ~1.5 inHg to get sea-level equivalent
+  
+For Dickinson, ND area (elevation ~2500 feet):
+  Add approximately 2.5 inHg to measured pressure for sea-level equivalent
+
+  ┌─────────────────────────────────────────────────────────────────┐
+  │  #define LOCAL_ELEVATION_FT  2500  // Your elevation in feet   │
+  │                                                                 │
+  │  float getSeaLevelPressure(float measured_inHg) {              │
+  │      // Approximate: add 1 inHg per 1000 ft elevation          │
+  │      return measured_inHg + (LOCAL_ELEVATION_FT / 1000.0);     │
+  │  }                                                              │
+  └─────────────────────────────────────────────────────────────────┘
+
+FIRMWARE STRATEGY: CONDITIONAL BME280 POWER
+-------------------------------------------
+Use the PT100 (which works down to -200°C) to gate BME280 operation.
+Power down at -30°F (-34°C) for safety margin:
+
+  ┌─────────────────────────────────────────────────────────────────┐
+  │  // In your main loop or sensor reading function               │
+  │                                                                 │
+  │  float outdoor_temp_c = readPT100();  // Always works          │
+  │                                                                 │
+  │  #define BME280_MIN_TEMP_C   -34.0   // -30°F with margin      │
+  │  #define BME280_MIN_TEMP_F   -30.0   // Display threshold      │
+  │  #define BME280_POWER_PIN     7      // GPIO controlling BME280│
+  │                                                                 │
+  │  bool bme280_enabled = false;                                  │
+  │                                                                 │
+  │  if (outdoor_temp_c > BME280_MIN_TEMP_C) {                     │
+  │      // Safe to operate BME280                                 │
+  │      if (!bme280_enabled) {                                    │
+  │          digitalWrite(BME280_POWER_PIN, HIGH);                 │
+  │          delay(100);  // Allow sensor to stabilize             │
+  │          bme.begin();  // Re-initialize after power-up         │
+  │          bme280_enabled = true;                                │
+  │      }                                                          │
+  │      humidity_pct = bme.readHumidity();                        │
+  │      float pressure_hPa = bme.readPressure() / 100.0F;         │
+  │      pressure_inHg = pressure_hPa * 0.02953;                   │
+  │  } else {                                                       │
+  │      // Too cold - disable BME280 to protect it                │
+  │      if (bme280_enabled) {                                     │
+  │          digitalWrite(BME280_POWER_PIN, LOW);                  │
+  │          bme280_enabled = false;                               │
+  │      }                                                          │
+  │      humidity_pct = NAN;      // Mark as unavailable           │
+  │      pressure_inHg = NAN;     // Mark as unavailable           │
+  │  }                                                              │
+  └─────────────────────────────────────────────────────────────────┘
+
+HARDWARE: BME280 POWER CONTROL
+------------------------------
+Option 1: N-Channel MOSFET on GND (recommended)
+  - 2N7000 or similar logic-level MOSFET
+  - MCU GPIO -> 10K resistor -> MOSFET gate
+  - BME280 GND -> MOSFET drain
+  - MOSFET source -> system GND
+  - HIGH = BME280 ON, LOW = BME280 OFF
+
+Option 2: P-Channel MOSFET on VCC
+  - Use if sensor has pull-ups that would backfeed
+
+Option 3: Dedicated power switch IC
+  - TPS22918 or similar load switch
+  - Cleaner but adds cost/complexity
+
+                    ┌─────────────────┐
+     3.3V ──────────┤ VCC         SDA ├──── I2C SDA
+                    │                 │
+                    │     BME280      │
+                    │                 │
+     I2C SCL ───────┤ SCL         GND ├──┐
+                    └─────────────────┘  │
+                                         │
+                                    ┌────┴────┐
+                                    │    D    │
+                    GPIO ──[10K]────┤ G     S ├──── GND
+                                    │  2N7000 │
+                                    └─────────┘
+
+
+NOTE: BME280 data (humidity and pressure) is displayed via the web
+interface only, not on the LCD. The LCD shows temperature data from
+the PT100 which is always available.
+
+
+UPDATED SYSTEM ARCHITECTURE
+---------------------------
+
+  ┌──────────────────────────────────────────────────────────────┐
+  │                    OUTDOOR SENSOR UNIT                       │
+  │                  (ASA 3D Printed Enclosure)                  │
+  │                                                              │
+  │   ┌─────────────────────────────────────────────────────┐   │
+  │   │  ALWAYS ACTIVE                                      │   │
+  │   │  ┌─────────────┐                                    │   │
+  │   │  │   PT100     │ ← Stainless probe extends outside  │   │
+  │   │  │  + MAX31865 │   Works -200°C to +850°C           │   │
+  │   │  └─────────────┘                                    │   │
+  │   └─────────────────────────────────────────────────────┘   │
+  │                                                              │
+  │   ┌─────────────────────────────────────────────────────┐   │
+  │   │  CONDITIONALLY POWERED (when temp > -35°C)          │   │
+  │   │  ┌─────────────┐                                    │   │
+  │   │  │   BME280    │ ← Humidity + Pressure              │   │
+  │   │  │ (switched)  │   Only when safe to operate        │   │
+  │   │  └─────────────┘                                    │   │
+  │   │        │                                            │   │
+  │   │   ┌────┴────┐                                       │   │
+  │   │   │ MOSFET  │ ← Controlled by MCU based on PT100    │   │
+  │   │   └─────────┘                                       │   │
+  │   └─────────────────────────────────────────────────────┘   │
+  │                                                              │
+  │   ┌─────────────────────────────────────────────────────┐   │
+  │   │  MCU + POWER                                        │   │
+  │   │  - Arduino/ESP32 (keep warm, self-heating helps)    │   │
+  │   │  - Power regulator                                  │   │
+  │   │  - Optional small heater for extreme cold           │   │
+  │   └─────────────────────────────────────────────────────┘   │
+  │                                                              │
+  └──────────────────────────────────────────────────────────────┘
+
+
+WINDCHILL CONSIDERATIONS
+------------------------
+Windchill (-140°F / -96°C) affects human perception, not sensors directly.
+However, consider:
+
+  - Sensor self-heating: In extreme cold with high wind, sensor heat
+    dissipates faster. PT100 has minimal self-heating.
+  - Cable/connector brittleness: Standard PVC cables become brittle
+    below -40°C. Use PTFE or silicone insulated cables.
+  - Moisture ingress: Ensure IP67+ rated enclosures and cable glands
+  - Power supply: Batteries fail in extreme cold. Use wired power or
+    lithium batteries (rated to -40°C)
+
+
+COMPONENT COLD-WEATHER CONSIDERATIONS
+-------------------------------------
+┌─────────────────────┬─────────────────────────────────────────────────────┐
+│ Component           │ Cold Weather Notes                                  │
+├─────────────────────┼─────────────────────────────────────────────────────┤
+│ PT100 Probe         │ Stainless steel probes handle extreme cold well.   │
+│                     │ Use PTFE-insulated leads, not PVC.                  │
+├─────────────────────┼─────────────────────────────────────────────────────┤
+│ MAX31865 Amplifier  │ Operating range -40°C to +85°C. Keep in heated     │
+│                     │ enclosure with microcontroller.                     │
+├─────────────────────┼─────────────────────────────────────────────────────┤
+│ Microcontroller     │ Most MCUs rated -40°C to +85°C. Keep in enclosure. │
+│                     │ Industrial-rated parts available for extended temp.│
+├─────────────────────┼─────────────────────────────────────────────────────┤
+│ Display (LCD/TFT)   │ Standard LCDs fail below -20°C. Use heated         │
+│                     │ enclosure or industrial-rated display.             │
+├─────────────────────┼─────────────────────────────────────────────────────┤
+│ Power Supply        │ Switching supplies may not start in extreme cold.  │
+│                     │ Consider linear supply or keep in heated area.     │
+├─────────────────────┼─────────────────────────────────────────────────────┤
+│ Cables              │ PVC brittle below -40°C. Use PTFE/silicone/Tefzel. │
+│                     │ Adafruit #642 high-temp probe uses PTFE cable.     │
+└─────────────────────┴─────────────────────────────────────────────────────┘
+
+
+RECOMMENDED OUTDOOR CONFIGURATION
+---------------------------------
+
+             ┌─────────────────────────────────────────┐
+             │         OUTDOOR (exposed)              │
+             │                                         │
+             │   ┌───────────────┐                    │
+             │   │  PT100 Probe  │ ← Stainless steel  │
+             │   │  (waterproof) │   PTFE cable       │
+             │   └───────┬───────┘                    │
+             │           │                            │
+             └───────────┼────────────────────────────┘
+                         │
+             ┌───────────┼────────────────────────────┐
+             │           │   HEATED ENCLOSURE         │
+             │           ↓                            │
+             │   ┌───────────────┐    ┌───────────┐  │
+             │   │   MAX31865    │    │  BME280   │  │
+             │   │   Amplifier   │    │(hum+press)│  │
+             │   └───────┬───────┘    └─────┬─────┘  │
+             │           │                  │        │
+             │           └──────┬───────────┘        │
+             │                  ↓                    │
+             │          ┌──────────────┐             │
+             │          │ Arduino/MCU  │             │
+             │          └──────────────┘             │
+             │                                       │
+             │   [Small heater maintains >-30°C]     │
+             └───────────────────────────────────────┘
+
+This configuration lets you:
+  - Measure true outdoor temperature down to -60°F with PT100
+  - Get humidity + pressure from BME280 (in heated enclosure)
+  - Keep electronics within their operating range
+  - Handle windchill conditions (sensor probe is exposed)
+
+
+================================================================================
+                              SOURCES / CITATIONS
+================================================================================
+
+PREMIUM / HIGH-ACCURACY SENSORS
+-------------------------------
+
+TMP117 (±0.1°C):
+  - Texas Instruments TMP117 Datasheet: "The TMP117 provides a 16-bit 
+    temperature result with a resolution of 0.0078°C and an accuracy of up 
+    to ±0.1°C across the temperature range of -20°C to 50°C with no 
+    calibration."
+  - Source: https://www.ti.com/product/TMP117
+  - TI describes it as meeting "ASTM E1112 and ISO 80601 requirements for 
+    electronic patient thermometers" and as a "single chip digital 
+    alternative to a Platinum RTD" with "accuracy comparable to a Class AA RTD"
+
+MCP9808 (±0.25°C typical, ±0.5°C max):
+  - Microchip MCP9808 Datasheet: "MCP9808 digital temperature sensor converts 
+    temperatures between -20°C and +100°C to a digital word with ±0.25°C/±0.5°C 
+    (typical/maximum) accuracy"
+  - Source: https://ww1.microchip.com/downloads/en/DeviceDoc/MCP9808-0.5C-Maximum-Accuracy-Digital-Temperature-Sensor-Data-Sheet-DS20005095B.pdf
+  - Operating range: -40°C to +125°C
+
+SHT45 (±0.1°C):
+  - Sensirion SHT4x Datasheet (Version 6.4, November 2023): SHT45 specifications
+    show ±0.1°C typical temperature accuracy
+  - Source: https://sensirion.com/media/documents/33FD6951/6555C40E/Sensirion_Datasheet_SHT4x.pdf
+  - Features ±1.0% RH humidity accuracy, ISO17025 calibration certificates
+
+
+RECOMMENDED FOR THERMOSTATS
+---------------------------
+
+SHT31 (±0.2-0.3°C):
+  - Sensirion SHT3x-DIS Datasheet (Version 7, December 2022): "Accuracy 
+    tolerance Typ. 10 to +55°C: 0.3°C"
+  - Source: https://sensirion.com/media/documents/213E6A3B/63A5A569/Datasheet_SHT3x_DIS.pdf
+  - Humidity accuracy: ±2% RH typical
+  - Operating range: -40°C to +125°C
+
+SHT40 (±0.2°C):
+  - Sensirion SHT4x Datasheet: "SHT40 T Accuracy Typ. 0.2°C"
+  - Source: https://sensirion.com/media/documents/33FD6951/6555C40E/Sensirion_Datasheet_SHT4x.pdf
+  - Humidity accuracy: ±1.8% RH typical
+  - Supply voltage: 1.08V to 3.6V
+
+DS18B20 (±0.5°C):
+  - Analog Devices (formerly Maxim/Dallas) DS18B20 Datasheet: "±0.5°C 
+    Accuracy from -10°C to +85°C"
+  - Source: https://www.analog.com/media/en/technical-documentation/data-sheets/DS18B20.pdf
+  - Full range: -55°C to +125°C
+  - Resolution: 9 to 12 bits selectable
+
+Si7021 (±0.4°C):
+  - Silicon Labs Si7021-A20 Datasheet (Rev 1.3, June 2022): "High Accuracy 
+    Temperature Sensor ±0.4°C (max), 10 to 85°C"
+  - Source: https://www.silabs.com/documents/public/data-sheets/Si7021-A20.pdf
+  - Humidity accuracy: ±3% RH (max), 0-80% RH
+  - Applications listed include "HVAC/R" and "Thermostats/humidistats"
+
+HTU21D (±0.3°C):
+  - TE Connectivity HTU21D(F) Datasheet: Specifies ±0.3°C typical temperature 
+    accuracy and ±2% RH humidity accuracy
+  - Source: https://www.te.com/commerce/DocumentDelivery/DDEController?Action=showdoc&DocId=Data+Sheet%7FHPC199_6%7FA6%7Fpdf%7FEnglish%7FENG_DS_HPC199_6_A6.pdf%7FCAT-HSC0004
+  - Operating range: -40°C to +125°C temperature, 0-100% RH humidity
+  - I2C digital output, individually calibrated
+
+
+NOTE ON ACCURACY SPECIFICATIONS
+-------------------------------
+Accuracy specifications vary by temperature range. Values shown in the 
+comparison tables are for typical indoor thermostat operating conditions 
+(approximately 0°C to 50°C). Consult manufacturer datasheets for full 
+accuracy curves across the complete operating range.
+
+
+================================================================================
+                         RECOMMENDATION SUMMARY
+================================================================================
+
+For This Thermostat Project:
+----------------------------
+  1. PRIMARY:  SHT31 or SHT40 - Best balance of accuracy and features
+  2. BUDGET:   DS18B20 - Proven reliability, good accuracy
+  3. AVOID:    DHT11/DHT22 - Unreliable for control applications
+
+Key Selection Criteria:
+-----------------------
+  * Accuracy:      ±0.5°C or better (users notice 1°F / 0.56°C differences)
+  * Response:      1 second adequate for thermostat sampling rates
+  * Reliability:   Must work consistently (DHT failures cause erratic heating)
+  * Self-Heating:  Keep sensor away from heat-generating components
+  * Stability:     Quality sensors maintain calibration for years
+
+================================================================================

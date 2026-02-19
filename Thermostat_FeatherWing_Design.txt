@@ -1,0 +1,735 @@
+===========================================================================
+  eyeSPI Thermostat FeatherWing -- Hardware Design Document
+===========================================================================
+
+  2.8" TFT + Capacitive Touch + MAX31865 PT100 + BME280
+  Feather-Stacking Form Factor
+
+  Revision: A (Draft)
+  Date:     February 2026
+
+
+===========================================================================
+1. OVERVIEW
+===========================================================================
+
+This document describes the design of a custom FeatherWing PCB that
+consolidates the eyeSPI thermostat project into a single, Feather-stacking
+display and sensor board.  The board replaces three separate components
+(eyeSPI FeatherWing breakout, Adafruit #2090 TFT breakout, and Adafruit
+#3328 MAX31865 breakout) with one integrated FeatherWing.
+
+
+1.1 Design Goals
+---------------------------------------------------------------------------
+
+- Feather-stacking form factor with dual female headers (12+16 pin),
+  similar to Adafruit 3.5" TFT FeatherWing (#3651)
+- 2.8" 320x240 ILI9341 TFT with capacitive touchscreen (FT6236/CST026)
+- Integrated MAX31865 RTD amplifier for PT100 temperature sensing
+- Integrated BME280 environmental sensor (temperature, humidity, pressure)
+- microSD card socket with optional card detect
+- At least one STEMMA QT / Qwiic I2C port
+- Optional EYESPI 18-pin FPC connector (if board space permits)
+- GPIO 10 reserved (pass-through only) for PoE FeatherWing compatibility
+- Zero firmware changes required for display, touch, and sensor code
+
+
+1.2 Current vs. Proposed Architecture
+---------------------------------------------------------------------------
+
+  Aspect              Current Architecture            Proposed FeatherWing
+  ------------------  ------------------------------  ----------------------------
+  Display             #2090 breakout + FPC cable      Bare #2770 panel, direct
+                                                      50-pin FPC to PCB
+  Display Adapter     Custom eyeSPI FeatherWing PCB   Integrated on FeatherWing
+  PT100 Amplifier     #3328 breakout (separate)       MAX31865 integrated
+  BME280              #2652 breakout or #5303         BME280 integrated
+  Board Count         3-4 boards + FPC cable          1 FeatherWing + Feather
+  Connections         SPI wiring, I2C wiring, FPC     Feather headers only
+                                                      (+ PT100 terminal)
+
+
+===========================================================================
+2. BILL OF MATERIALS
+===========================================================================
+
+2.1 Major Components
+---------------------------------------------------------------------------
+
+  Component             Part / Source                      Function
+  --------------------  --------------------------------  ----------------------
+  TFT Display Panel     Adafruit #2770                    320x240 ILI9341 +
+                        (bare 2.8" + FT6236 cap touch)    capacitive touchscreen
+  50-pin FPC Connector  Adafruit #1773                    Connects bare display
+                        (0.5mm pitch, top-contact)        panel to PCB
+  MAX31865              Analog Devices MAX31865            RTD-to-digital converter
+                        ATP+ (20-TQFN) or                 for PT100
+                        AAP+ (20-SSOP)
+  Reference Resistor    430 ohm 0.1% precision            ADC reference for
+                                                          MAX31865
+  BME280                Bosch BME280                      Temperature, humidity,
+                        (LGA-8, 2.5x2.5mm)               pressure sensor
+  microSD Socket        Standard push-push connector      SD card storage
+  STEMMA QT Connector   JST SH 4-pin                     I2C expansion port
+                        (GND, 3.3V, SDA, SCL)
+  Feather Headers       Dual female (12-pin + 16-pin)     Feather stacking
+  3-pos Terminal Block  3.5mm pitch screw terminal        PT100 RTD connection
+                                                          (3-wire)
+  EYESPI Connector      18-pin 0.5mm FPC                  External display output
+                        (optional, if space permits)
+
+
+2.2 Support Components
+---------------------------------------------------------------------------
+
+  Component             Value / Part                      Purpose
+  --------------------  --------------------------------  ----------------------
+  Decoupling Caps       100nF ceramic (x3-4)              Power decoupling for
+                                                          MAX31865, BME280, SD
+  Bulk Cap              10uF ceramic                      Main rail decoupling
+  RTD Filter Caps       100nF (x2) on RTDIN+/RTDIN-      Noise filtering for
+                                                          PT100 input
+  MAX31865 BIAS Res.    Per datasheet reference circuit    Current source biasing
+  Backlight Resistor    Current limiting for 4x LEDs      LED drive (~80-100mA)
+  Pull-up Resistors     4.7k ohm (x2) on SDA/SCL         I2C bus pull-ups
+  SPI Mode Jumpers      Solder jumpers (IM0-IM3)          Set ILI9341 to 4-wire
+                                                          SPI mode
+  2/3/4-Wire Jumpers    Solder pads for RTD config        Configure MAX31865
+                                                          wire mode
+
+
+2.3 Component Sourcing Reference (DigiKey + LCSC/JLCPCB)
+---------------------------------------------------------------------------
+
+The following lists part numbers for key components on both DigiKey
+and LCSC (JLCPCB's component supplier).  LCSC part numbers use the
+C###### format and are directly usable in JLCPCB's SMT assembly
+service.  Passive components are listed as representative examples;
+equivalent parts from other manufacturers are acceptable provided
+they meet the same specifications.
+
+Pricing shown is approximate at time of writing and will fluctuate.
+
+
+  MAJOR ICs AND SENSORS
+
+  Component               Mfg Part Number           Package
+  ----------------------  ------------------------  -------------------------
+  MAX31865 RTD amplifier  MAX31865ATP+              20-TQFN (QFN-20, 5x5mm)
+    DigiKey:  MAX31865ATP+-ND                        ~$7.84 ea
+    LCSC:     C404011  (tube)                        ~$2.36 ea
+    LCSC:     C118474  (tape & reel, +T suffix)      ~$2.17 ea
+    JLCPCB:   C118474  (SMT assembly compatible)
+
+  MAX31865 RTD amplifier  MAX31865AAP+              20-SSOP (hand-solder alt)
+    DigiKey:  MAX31865AAP+-ND                        ~$9.01 ea
+    LCSC:     C779509  (tape & reel, +T suffix)      ~$2.37 ea
+    JLCPCB:   C779509  (SMT assembly compatible)
+
+  BME280 env. sensor      BME280                    LGA-8 (2.5x2.5mm)
+    DigiKey:  828-1063-1-ND                          ~$4.03 ea
+    LCSC:     C92489                                 ~$3.29 ea
+    JLCPCB:   C92489   (Standard PCBA only, high difficulty)
+
+  Note: JLCPCB classifies the BME280 as "high assembly difficulty"
+  due to its small LGA-8 package.  It is available only under their
+  Standard (not Economic) PCBA service tier.
+
+
+  CONNECTORS
+
+  Component               Mfg Part Number           Package/Type
+  ----------------------  ------------------------  -------------------------
+  STEMMA QT / Qwiic       SM04B-SRSS-TB(LF)(SN)    JST SH, 1.0mm pitch
+    JST SH 4-pin SMD                                 4 pos, right-angle SMD
+    right-angle header
+    DigiKey:  455-SM04B-SRSS-TB(LF)(SN)CT-ND
+    LCSC:     C160404                                ~$0.16 ea
+    JLCPCB:   C160404  (SMT assembly compatible)
+
+  microSD Socket           DM3AT-SF-PEJM5           Hirose, push-push w/ det
+    push-push w/ detect                              8 pos, right-angle SMD
+    DigiKey:  HR1964CT-ND                            ~$2.89 ea
+    LCSC:     C114218                                ~$0.66 ea
+    JLCPCB:   C114218  (SMT assembly compatible)
+
+  50-pin FPC connector    (see notes 1 & 2)         0.5mm pitch, top-contact
+    0.5mm ZIF                                        50 pos, right-angle SMD
+
+  Note 1: The Adafruit #1773 FPC connector is sold through Adafruit
+  and some DigiKey Adafruit listings but is not a standard DigiKey
+  catalog part.  Equivalent 50-pin 0.5mm top-contact ZIF connectors
+  are available from Molex (Easy-On series) and TE Connectivity on
+  DigiKey.  Verify pin-to-pin compatibility with the #2770 display
+  panel FPC before substituting.
+
+  Note 2: LCSC/JLCPCB alternative -- XFCN F0501-T-50-20T-R is a
+  50-pin 0.5mm pitch top-contact slide-lock FPC connector available
+  on JLCPCB as C481229.  CRITICAL: Verify contact alignment and
+  mechanical fit with the #2770 bare display panel FPC tail before
+  committing to this part.  The Adafruit #1773 connector is the only
+  one confirmed compatible with the #2770 panel.
+
+  3-pos Screw Terminal    (various)                 3.5mm pitch, through-hole
+    for RTD wires                                    F+/RTD+/RTD-
+    DigiKey:  various, 3.5mm pitch (Adafruit #2136 or equiv)
+    LCSC:     Search "3P 3.5mm screw terminal" -- many options from
+              Cixi Kefa, Dinkle, Degson.  Common JLCPCB parts include
+              WJ126V-3.5-3P and similar.  Match footprint to layout.
+
+
+  PRECISION RESISTOR (RREF)
+
+  Component               Recommended Families      Package
+  ----------------------  ------------------------  -------------------------
+  430 ohm 0.1% thin film  Vishay TNPW, Yageo RT,   0805 or 0603
+                           Stackpole RNCF, TE RN73
+    DigiKey:  Search parametrically: Chip Resistor >
+              430 Ohms > 0.1% > thin film > 0805 (or 0603)
+    LCSC:     Search parametrically: Chip Resistor >
+              430 Ohms > 0.1% tolerance > thin film > 0805
+
+  Note: 430 ohm is NOT an E96 standard value, so this resistor is
+  harder to source than typical precision values.  It IS available
+  from major thin film resistor families but stock rotates.  Search
+  both DigiKey and LCSC parametrically and order spares.
+
+  Potential LCSC sources (verify availability before ordering):
+    - Meritek RN73 series (0805, 0.1%, thin film -- available on LCSC)
+    - UniOhm / UNI-ROYAL thin film series
+    - TyOhm precision thin film
+  Search tip on LCSC: Chip Resistor > filter Resistance=430Ω,
+  Tolerance=±0.1%, type=thin film.  On JLCPCB parts page, use the
+  same parametric filters.
+
+
+  REPRESENTATIVE PASSIVES (any equivalent acceptable)
+
+  Component               Description               Notes
+  ----------------------  ------------------------  -------------------------
+  100nF 0402/0603 MLCC    X7R, 16V min              Decoupling caps
+  10uF 0805 MLCC          X5R/X7R, 10V min          Bulk bypass
+  4.7k ohm 0402/0603 1%   Thick film acceptable     I2C pull-ups
+
+  Note: Passive component selection depends on final PCB footprint
+  choices (0402 vs 0603 vs 0805).  Use parametric search on either
+  DigiKey or LCSC to filter by value, tolerance, package size, and
+  voltage rating.
+
+  LCSC passives tip: LCSC categorizes parts as "Basic" or "Extended"
+  for JLCPCB assembly.  Basic parts have no extra setup fee.  Common
+  passives (100nF MLCC, 10uF MLCC, 4.7k resistor) are almost always
+  available as Basic parts, which significantly reduces assembly cost.
+  Prefer Basic parts when possible.
+
+
+  ADAFRUIT PARTS (available on DigiKey via Adafruit storefront)
+
+  Component               DigiKey P/N               Adafruit P/N
+  ----------------------  ------------------------  -------------------------
+  2.8" Bare TFT Panel     1528-2770-ND              Adafruit #2770
+  Feather Headers          (varies by config)        12+16 pin female stacking
+  3-pos Screw Terminal     (various, 3.5mm pitch)    Adafruit #2136 or equiv
+
+  Note: Adafruit #2770 bare display panel and Feather stacking
+  headers are specialty parts best sourced from Adafruit directly
+  or via the DigiKey Adafruit storefront.  These are not available
+  on LCSC.
+
+
+  SUPPLIER COMPARISON SUMMARY
+
+  Part                  DigiKey         LCSC/JLCPCB     Notes
+  --------------------  --------------  --------------  ----------------------
+  MAX31865ATP+ (TQFN)   ~$7.84          ~$2.17-2.36     Big savings on LCSC
+  MAX31865AAP+ (SSOP)   ~$9.01          ~$2.37          Big savings on LCSC
+  BME280 (LGA-8)        ~$4.03          ~$3.29          Comparable
+  JST SH 4-pin          ~$1.00          ~$0.16          Much cheaper on LCSC
+  Hirose microSD        ~$2.89          ~$0.66          Much cheaper on LCSC
+  430 ohm 0.1%          varies          varies          Check availability
+  Bare TFT #2770        DigiKey/Adafruit only           Not on LCSC
+  Feather Headers       DigiKey/Adafruit only           Not on LCSC
+
+
+===========================================================================
+3. FEATHER PIN MAPPING
+===========================================================================
+
+The following tables map Feather header pins to on-board functions.  The
+design maintains compatibility with the existing firmware pin assignments.
+
+
+3.1 SPI Bus (Shared)
+---------------------------------------------------------------------------
+
+  Signal    Feather Pin    Connected To
+  --------  -----------    -----------------------------------------
+  SCK       SCK            ILI9341, MAX31865, SD card
+  MOSI      MOSI           ILI9341, MAX31865, SD card
+  MISO      MISO           ILI9341, MAX31865, SD card
+
+
+3.2 Chip Select & Control
+---------------------------------------------------------------------------
+
+  Signal        Feather Pin    Function                  Notes
+  ------------  -----------    ------------------------  -------------------
+  TFT_CS        6              ILI9341 chip select       Active low
+  TFT_DC        9              ILI9341 data/command      High=data, Low=cmd
+  SD_CS         5              microSD chip select       Active low
+  MAX31865_CS   12             MAX31865 chip select      Active low
+  *** RESERVED  10             PoE FeatherWing (W5500)   PASS-THROUGH ONLY
+                                                         Not connected to
+                                                         any on-board device
+
+  GPIO 10 is the standard Feather SPI chip select pin used by the PoE
+  FeatherWing (W5500 Ethernet).  This pin is passed through the Feather
+  headers but must not be directly connected to any on-board device.  When
+  a PoE FeatherWing is stacked below, it uses GPIO 10 for W5500_CS.
+
+
+3.3 I2C Bus (Shared)
+---------------------------------------------------------------------------
+
+  Signal    Feather Pin    Connected To
+  --------  -----------    -----------------------------------------
+  SDA       SDA            FT6236 touch (0x38), BME280 (0x77),
+                           STEMMA QT, EYESPI (if fitted)
+  SCL       SCL            FT6236 touch (0x38), BME280 (0x77),
+                           STEMMA QT, EYESPI (if fitted)
+
+
+3.4 Optional / Configurable (via solder jumpers)
+---------------------------------------------------------------------------
+
+  Signal      Feather Pin    Function                 Default
+  ----------  -----------    -----------------------  ---------
+  SD_DET      A0             microSD card detect      Open
+  BME_PWR     A1             BME280 power control     Open
+  RELAY       13             Relay / MOSFET output    Open
+  TFT_RST     RST            ILI9341 reset            Tied to Feather RST
+  Touch IRQ   11             FT6236 interrupt         Open
+
+
+3.5 Free Feather Pins
+---------------------------------------------------------------------------
+
+The following Feather pins are unused by the FeatherWing and available
+for user projects via the dual headers:
+
+  - GPIO 10 -- Reserved for PoE FeatherWing, passed through only
+  - A2 - A5 -- Free analog/digital pins
+  - D0 (RX), D1 (TX) -- Serial UART pins
+  - D11 -- Free digital (unless used for Touch IRQ)
+  - D13 -- Free digital (unless used for Relay output)
+
+
+===========================================================================
+4. CIRCUIT DESIGN NOTES
+===========================================================================
+
+4.1 TFT Display Interface
+---------------------------------------------------------------------------
+
+The bare 2.8" TFT panel (#2770) connects via a 50-pin 0.5mm pitch FPC
+connector (#1773).  The ILI9341 display controller is configured for
+4-wire SPI mode via IM pin strapping (solder jumpers on PCB).  The display
+FPC carries both the ILI9341 SPI signals and the FT6236 capacitive touch
+I2C signals.
+
+  - ILI9341 uses SPI mode 0, clock up to 40MHz (board-dependent)
+  - FT6236 capacitive touch controller on I2C address 0x38
+  - Backlight driven from 3.3V via current-limiting resistor
+    (4x white LEDs, ~80-100mA total)
+  - TFT_RST tied to Feather RST by default (solder jumper to separate)
+
+
+4.2 MAX31865 RTD Amplifier
+---------------------------------------------------------------------------
+
+The MAX31865 is an SPI-attached RTD-to-digital converter.  The reference
+design follows the Adafruit #3328 breakout schematic:
+
+  - Reference resistor: 430 ohm 0.1% precision (RREF for PT100)
+  - Default configuration: 3-wire RTD (solder jumpers for 2/4-wire)
+  - SPI chip select on GPIO 12 (existing firmware default)
+  - 100nF filter capacitors on RTDIN+ and RTDIN- inputs
+  - 3-position screw terminal block for PT100 connection (F+, RTD+, RTD-)
+  - VDD powered from 3.3V rail (no separate regulator needed)
+  - RDY pin not connected (firmware uses polling)
+
+Note: The Adafruit #3328 breakout includes a 3.3V regulator and level
+shifters for 5V compatibility.  Since all Feathers are 3.3V native, these
+are not needed on this FeatherWing.
+
+
+4.3 BME280 Environmental Sensor
+---------------------------------------------------------------------------
+
+The BME280 is placed directly on the PCB with I2C interface:
+
+  - I2C address: 0x77 (SDO pin tied to VDDIO)
+  - Powered from 3.3V rail (1.8-3.6V range, ~1mA typical)
+  - 100nF decoupling capacitor on VDD
+  - Optional power control via GPIO A1 solder jumper (extreme cold)
+  - Placed away from heat sources (MAX31865, backlight driver, Feather
+    MCU) to minimize self-heating effects on temperature readings
+
+
+4.4 microSD Card
+---------------------------------------------------------------------------
+
+A standard push-push microSD socket with SPI interface:
+
+  - SD_CS on GPIO 5 (existing firmware default)
+  - Optional card detect switch routed to A0 via solder jumper
+  - 100nF decoupling capacitor
+  - Operates at 3.3V (no level shifting needed)
+
+
+4.5 STEMMA QT / Qwiic Port
+---------------------------------------------------------------------------
+
+At least one JST SH 4-pin STEMMA QT connector for I2C expansion:
+
+  - Standard Adafruit STEMMA QT pinout: GND, VCC (3.3V), SDA, SCL
+  - Directly connected to Feather I2C bus (shared with BME280 + touch)
+  - 4.7k ohm pull-up resistors on SDA/SCL (disable via solder jumper
+    if external pull-ups already exist)
+
+
+4.6 EYESPI Connector (Optional)
+---------------------------------------------------------------------------
+
+If board space permits, an 18-pin 0.5mm pitch EYESPI FPC connector
+provides an external display output for driving a second remote display.
+
+  EYESPI 18-Pin Connector Pinout:
+
+  Pin    Signal    Source
+  -----  --------  --------------------------------------------------
+  1      GND       Power ground
+  2      SCK       SPI clock (shared)
+  3      MOSI      SPI data out (shared)
+  4      MISO      SPI data in (shared)
+  5      TCS       EYESPI header pad (NOT shared with on-board TFT)
+  6      RST       From Feather RST or dedicated GPIO
+  7      DC        EYESPI header pad (NOT shared with on-board TFT)
+  8      SDCS      EYESPI header pad (optional)
+  9      GP1       User-assignable GPIO
+  10     GP2       User-assignable GPIO
+  11     TSCS      Touch screen CS (if remote display has touch)
+  12     MEMCS     Memory CS (for E-Ink displays)
+  13     SDA       I2C data (shared bus)
+  14     SCL       I2C clock (shared bus)
+  15     BUSY      E-Ink busy pin (optional)
+  16     INT       Touch interrupt (optional)
+  17     LITE      Backlight control (optional)
+  18     3.3V      Power (from Feather 3.3V rail)
+
+  Note: The EYESPI TCS and DC pins must use their own GPIO assignments
+  separate from the on-board TFT_CS (6) and TFT_DC (9).  This requires
+  two additional free GPIOs assigned via solder jumpers (e.g., A2, A3).
+
+
+===========================================================================
+5. POWER DESIGN
+===========================================================================
+
+The FeatherWing is powered entirely from the Feather 3.3V rail.  No
+on-board voltage regulators are needed.
+
+5.1 Power Budget
+---------------------------------------------------------------------------
+
+  Component          Typical     Peak        Notes
+  -----------------  ----------  ----------  ---------------------------
+  ILI9341 TFT        ~10mA       ~15mA      Display controller only
+  Backlight (4xLED)  ~80mA       ~100mA     Dominant power consumer
+  FT6236 Touch       ~3mA        ~5mA       Capacitive touch controller
+  MAX31865           ~1mA        ~2mA       During conversion
+  BME280             ~0.3mA      ~1mA       During measurement
+  microSD Card       ~30mA       ~100mA     Peak during write
+  -----------------  ----------  ----------  ---------------------------
+  TOTAL              ~125mA      ~225mA     Within Feather 3.3V regulator
+                                            capacity (500mA+)
+
+
+===========================================================================
+6. TEMPERATURE LIMITS
+===========================================================================
+
+The system operating temperature is limited by the TFT LCD panel
+(liquid crystal fluid and backlight LEDs), which has the narrowest
+range of any component on the board.
+
+6.1 Operating Temperature
+---------------------------------------------------------------------------
+
+  Minimum:  -20C  (-4F)
+  Maximum:  +70C  (+158F)
+
+6.2 Storage Temperature
+---------------------------------------------------------------------------
+
+  Minimum:  -30C  (-22F)
+  Maximum:  +80C  (+176F)
+
+6.3 Per-Component Ranges (Operating)
+---------------------------------------------------------------------------
+
+  Component              Min       Max       Limiting Factor
+  ---------------------  --------  --------  -------------------------
+  TFT LCD Panel (module) -20C      +70C      Liquid crystal fluid
+  ILI9341 driver IC      -40C      +85C
+  FT6236 touch ctrl      -40C      +85C
+  MAX31865               -40C      +125C
+  BME280                 -40C      +85C
+  ESP32-S2 (module)      -40C      +85C
+  ESP32-S2 (SoC only)    -40C      +105C
+  ---------------------  --------  --------  -------------------------
+  SYSTEM                 -20C      +70C      Set by TFT LCD panel
+
+6.4 Notes
+---------------------------------------------------------------------------
+
+  - The TFT LCD panel is the only component that limits operation
+    below -20C.  All ICs and sensors are rated to -40C.
+
+  - At low temperatures the liquid crystal fluid becomes sluggish,
+    causing slow refresh and faded contrast.  Below -20C the fluid
+    can freeze and the display may not function at all.
+
+  - At high temperatures the liquid crystal can degrade, causing
+    dark spots or permanent damage above +80C (storage) or
+    prolonged operation above +70C.
+
+  - Backlight LED efficiency drops in extreme cold but the LEDs
+    themselves are not damaged.
+
+  - For outdoor sensor units where the display is not needed, the
+    backlight can be disabled in firmware and the LCD left dormant.
+    The remaining components (MAX31865, BME280, ESP32-S2) will
+    continue to operate down to -40C.
+
+
+===========================================================================
+7. PCB LAYOUT CONSIDERATIONS
+===========================================================================
+
+7.1 Board Dimensions
+---------------------------------------------------------------------------
+
+The FeatherWing follows the standard Adafruit Feather form factor with
+dual stacking headers.  However, the 2.8" display panel (69mm x 50mm)
+is wider than the standard Feather outline (50.8mm x 22.86mm).  The PCB
+extends beyond the Feather footprint to accommodate the display, similar
+to how the #3651 FeatherWing extends for its 3.5" panel.
+
+  - Display panel dimensions: 69mm x 50mm x 4mm
+  - Feather header spacing: 50.8mm center-to-center (long axis)
+  - PCB should center the Feather headers beneath the display
+  - Component placement on the bottom side (between display and Feather)
+
+
+7.2 Component Placement Guidelines
+---------------------------------------------------------------------------
+
+  BME280:       Place near a board edge or vent hole, away from heat-
+                generating components (backlight transistor, MAX31865,
+                Feather MCU).  Consider a thermal isolation slot in the
+                PCB if feasible.
+
+  MAX31865:     Place near the screw terminal block to minimize trace
+                length to the PT100 sensor.  Keep analog traces (RTDIN+,
+                RTDIN-, REFIN+, REFIN-) away from SPI clock and digital
+                signals.
+
+  microSD:      Accessible from a board edge for card insertion.
+
+  STEMMA QT:    Accessible from a board edge.
+
+  Screw term.:  Accessible from a board edge for PT100 wire routing.
+
+  EYESPI FPC:   Accessible from a board edge (if fitted).
+
+  50-pin FPC:   Top side of PCB, centered for display panel alignment.
+
+
+7.3 SPI Bus Routing
+---------------------------------------------------------------------------
+
+All four SPI devices (TFT, MAX31865, SD, and optional EYESPI) share the
+MOSI, MISO, and SCK bus.  Keep bus traces short with matched lengths
+where practical.  Each chip select line should be routed independently
+from the Feather header to its respective device.  Add 100 ohm series
+resistors on MOSI and SCK near the bus driver if signal integrity is a
+concern at high clock rates.
+
+
+7.4 I2C Bus Routing
+---------------------------------------------------------------------------
+
+The I2C bus connects the FT6236 touch controller, BME280, STEMMA QT
+port, and optional EYESPI connector.  A single pair of 4.7k ohm pull-up
+resistors on SDA and SCL is sufficient for the bus.  Route I2C traces
+away from SPI clock lines to prevent crosstalk.
+
+
+===========================================================================
+8. SOLDER JUMPER CONFIGURATION
+===========================================================================
+
+The following solder jumpers allow the board to be configured for
+different use cases without firmware changes:
+
+  Jumper            Default          Function
+  ----------------  ---------------  ------------------------------------
+  RTD 2/3/4-Wire    3-wire (bridged) Configure MAX31865 for 2, 3, or
+                                     4-wire PT100.  Follows Adafruit
+                                     #3328 jumper pattern.
+  TFT_RST           Tied to RST      Cut to isolate TFT reset from
+                                     Feather reset.  Bridge to a GPIO
+                                     for independent control.
+  SD_DET -> A0      Open             Bridge to connect microSD card
+                                     detect switch to GPIO A0.
+  BME_PWR -> A1     Open             Bridge to power BME280 from GPIO
+                                     A1 instead of 3.3V rail (for cold
+                                     protection).
+  RELAY -> 13       Open             Bridge to route GPIO 13 to a relay
+                                     header pad.
+  Touch IRQ -> 11   Open             Bridge to connect FT6236 INT pin
+                                     to GPIO 11.
+  I2C Pull-ups      Enabled          Cut to disable on-board 4.7k ohm
+                                     I2C pull-up resistors.
+  SPI Mode (IM)     4-wire SPI       ILI9341 interface mode selection.
+                                     Factory default; do not modify.
+  EYESPI TCS        Open             Bridge to assign a GPIO (e.g., A2)
+                                     as EYESPI TFT chip select.
+  EYESPI DC         Open             Bridge to assign a GPIO (e.g., A3)
+                                     as EYESPI data/command.
+
+
+===========================================================================
+9. FIRMWARE COMPATIBILITY
+===========================================================================
+
+The FeatherWing is designed for zero firmware changes with the existing
+eyeSPI Thermostat codebase.  All pin assignments match current defaults:
+
+  Firmware Define     Value     FeatherWing Connection
+  ------------------  --------  -----------------------------------
+  TFT_CS              6         On-board ILI9341 chip select
+  TFT_DC              9         On-board ILI9341 data/command
+  SD_CS               5         On-board microSD chip select
+  MAX31865_CS         12        On-board MAX31865 chip select
+  W5500_CS            10        Pass-through only (PoE below)
+  RELAY_PIN           13        Via solder jumper (optional)
+  SDDET_PIN           A0        Via solder jumper (optional)
+  BME_POWER_PIN       A1        Via solder jumper (optional)
+
+Libraries required (unchanged from current project):
+  - Adafruit_ILI9341     -- TFT display driver
+  - Adafruit_FT6206      -- Capacitive touch (FT6236/CST026 compatible)
+  - Adafruit_MAX31865    -- RTD amplifier
+  - Adafruit_BME280      -- Environmental sensor (or Adafruit_BME680)
+  - SD                   -- microSD card access
+  - ArduinoJson          -- Configuration and API
+
+
+===========================================================================
+10. STACKING CONFIGURATIONS
+===========================================================================
+
+10.1 Indoor Thermostat (Minimal)
+---------------------------------------------------------------------------
+  Bottom:  Any Feather (M4, RP2040, ESP32-S2, etc.)
+  Top:     This FeatherWing
+
+  Provides: Display, touch, PT100, BME280, SD card.
+  Network via built-in WiFi (ESP32) or USB.
+
+
+10.2 Indoor Thermostat with PoE (Recommended)
+---------------------------------------------------------------------------
+  Bottom:  PoE FeatherWing (Silicognition)
+  Middle:  Feather (M4-Shim, RP2040-Shim, or ESP32-S2)
+  Top:     This FeatherWing
+
+  Provides: Everything above plus PoE Ethernet (W5500 on GPIO 10).
+  Single-cable installation.  ESP32-S2 enables DUAL_NETWORK mode
+  (simultaneous Ethernet + WiFi).
+
+
+10.3 Indoor Thermostat with Relay
+---------------------------------------------------------------------------
+  Bottom:  Power Relay FeatherWing (#3191, GPIO 13)
+  Middle:  Any Feather
+  Top:     This FeatherWing
+
+  Provides: Everything above plus direct HVAC relay control.
+  Bridge the RELAY -> 13 solder jumper on this FeatherWing.
+
+
+10.4 Outdoor Sensor Unit
+---------------------------------------------------------------------------
+  Bottom:  Any Feather with networking
+  Top:     This FeatherWing
+
+  Provides: PT100 + BME280 outdoor readings.  TFT backlight can be
+  disabled in firmware to save power.  Bridge BME_PWR -> A1 jumper
+  for cold protection if temperatures may fall below -40C/-40F.
+
+
+===========================================================================
+11. ADVANTAGES OVER CURRENT DESIGN
+===========================================================================
+
+  Aspect               Current (eyeSPI + breakouts)    Proposed FeatherWing
+  -------------------  ------------------------------  ----------------------
+  Board count          3-4 separate PCBs               1 FeatherWing
+  Cables / wiring      18-pin FPC + I2C + SPI wires    Feather headers only
+                                                       (+ PT100 terminal)
+  Assembly time        Significant (multiple boards)    Minimal (solder
+                                                       headers, plug in)
+  Failure points       FPC connector, jumper wires      Feather headers only
+  Cost (estimated)     ~$75-85 in breakout boards       ~$30-40 components
+                                                       + PCB fab
+  Display type         Capacitive touch (same)          Capacitive touch
+  Firmware changes     N/A (baseline)                   None required
+  PT100 sensor         Separate breakout + wiring       Integrated, screw
+                                                       terminal
+  BME280 sensor        Separate breakout or #5303       Integrated on board
+  I2C expansion        Manual wiring                    STEMMA QT port
+  External display     N/A                              EYESPI FPC (optional)
+
+
+===========================================================================
+12. OPEN DESIGN QUESTIONS
+===========================================================================
+
+- Board dimensions: Determine exact PCB outline that accommodates the
+  69x50mm display panel while keeping Feather header placement centered.
+  Reference the #3651 PCB dimensions (84x65mm) as a starting point for
+  a slightly smaller 2.8" version.
+
+- EYESPI connector feasibility: Verify that board space allows the 18-pin
+  FPC connector after placing all primary components.  The EYESPI connector
+  requires additional GPIO assignments (TCS, DC) via solder jumpers.
+
+- Thermal management: Validate that BME280 placement achieves acceptable
+  self-heating error.  Consider a thermal relief slot or placing the sensor
+  on a PCB tab extending beyond the main board area.
+
+- Second STEMMA QT port: Determine if a second STEMMA QT port can fit
+  (one on each accessible board edge).
+
+- Backlight control: Determine whether to use a simple resistor, a MOSFET
+  for PWM dimming from a Feather GPIO, or always-on.
+
+- Display mounting: Determine mechanical attachment method for the bare
+  display panel to the PCB (adhesive tape, standoffs, or frame clips).
+
+- KiCad library: Create or source KiCad footprints for the 50-pin FPC
+  connector, MAX31865 TSSOP-20, BME280 LGA-8, and Feather header template.

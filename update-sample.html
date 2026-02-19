@@ -1,0 +1,159 @@
+<!DOCTYPE html><html><head>
+<meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Firmware Update</title><style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#000;color:#eee;min-height:100vh}
+body{display:flex;justify-content:center;align-items:center;padding:20px}
+.container{text-align:center;max-width:500px;width:100%}
+h1{margin-bottom:20px;font-weight:300}h2{font-weight:400;margin-bottom:15px;font-size:18px}
+.card{background:rgba(255,255,255,0.08);border-radius:10px;padding:15px;margin-bottom:15px}
+.card{padding:30px}
+.btn{padding:8px 16px;font-size:13px;border:none;border-radius:6px;cursor:pointer;transition:all 0.2s;font-weight:500}
+.btn-primary{background:#4ade80;color:#000}.btn-primary:hover{background:#22c55e}
+.btn-danger{background:#ef4444;color:#fff}.btn-danger:hover{background:#dc2626}
+.btn-secondary{background:#64748b;color:#fff}.btn-secondary:hover{background:#475569}
+.btn-warning{background:#f59e0b;color:#000}.btn-warning:hover{background:#d97706}
+.btn:disabled{opacity:0.5;cursor:not-allowed}
+.btn{padding:12px 30px;font-size:15px}
+.file-input{display:none}
+.file-label{display:block;padding:40px 20px;border:2px dashed #666;border-radius:8px;cursor:pointer;transition:all 0.2s;margin-bottom:20px}
+.file-label:hover{border-color:#4ade80;background:rgba(74,222,128,0.1)}
+.file-label.selected{border-color:#4ade80;border-style:solid}
+.progress{display:none;margin:20px 0}
+.progress-bar{height:20px;background:#333;border-radius:10px;overflow:hidden}
+.progress-fill{height:100%;background:#4CAF50;width:0%;transition:width 0.3s}
+.status{margin-top:10px;padding:10px;border-radius:6px;font-size:13px}
+.status.error{background:rgba(239,68,68,0.2);color:#fca5a5}
+.status.success{background:rgba(74,222,128,0.2);color:#86efac}
+.warning{background:rgba(245,158,11,0.15);border:1px solid #f59e0b;border-radius:8px;padding:15px;margin-bottom:20px;text-align:left}
+.warning h3{color:#f59e0b;margin-bottom:10px}.warning ul{margin-left:20px}
+.divider{border-top:1px solid rgba(255,255,255,0.15);margin:25px 0}
+.crc{font-family:monospace;font-size:13px;color:#aaa;margin-top:8px}
+</style></head><body>
+<div class='container'>
+<h1>&#128295; Firmware Update</h1>
+<div class='card'>
+<div class='warning'>
+<h3>&#9888;&#65039; Warning</h3>
+<ul>
+<li>Do not power off during update</li>
+<li>Use only .bin files compiled for this board</li>
+<li>Device will reboot after successful update</li>
+</ul></div>
+{if $OTA_SUPPORTED == "1"}
+<h2>&#128225; Network OTA Update</h2>
+<form id='otaForm'>
+<label class='file-label' id='otaLabel'>
+<input type='file' class='file-input' id='otaFile' accept='.bin'>
+<span id='otaName'>&#128193; Click to select firmware file (.bin)</span>
+</label>
+<button type='submit' class='btn btn-primary' id='otaBtn' disabled>Upload &amp; Flash</button>
+</form>
+<div class='progress' id='otaProgress'>
+<div class='progress-bar'><div class='progress-fill' id='otaFill'></div></div>
+<div class='status' id='otaStatus'>Uploading...</div>
+</div>
+{/if}
+{if $SD_CARD == "1"}
+{if $OTA_SUPPORTED == "1"}<div class='divider'></div>{/if}
+<h2>&#128190; SD Card Firmware Update</h2>
+<form id='sdForm'>
+<label class='file-label' id='sdLabel'>
+<input type='file' class='file-input' id='sdFile' accept='.bin'>
+<span id='sdName'>&#128193; Click to select firmware file (.bin)</span>
+</label>
+<button type='submit' class='btn btn-primary' id='sdBtn' disabled>Upload to SD Card</button>
+</form>
+<div class='progress' id='sdProgress'>
+<div class='progress-bar'><div class='progress-fill' id='sdFill'></div></div>
+<div class='status' id='sdStatus'>Uploading...</div>
+</div>
+<div class='crc' id='sdCrc'></div>
+{/if}
+{if $OTA_SUPPORTED != "1"}
+{if $SD_CARD != "1"}
+<p>OTA updates are not supported on this board and no SD card is present.</p>
+<p>Please use USB to flash new firmware.</p>
+{/if}
+{/if}
+<div class='divider'></div>
+<button class='btn btn-warning' id='rebootBtn' onclick='doReboot()'>&#128260; Reboot Now</button>
+<div class='status' id='rebootStatus'></div>
+</div>
+<a href='/'><button class='btn btn-secondary' style='margin-top:20px'>&#8592; Back to Thermostat</button></a>
+</div>
+{literal}<script>
+function doReboot() {
+  if (!confirm('Reboot the thermostat now?')) return;
+  document.getElementById('rebootStatus').textContent = 'Rebooting...';
+  fetch('/api/reboot').then(() => {
+    document.getElementById('rebootStatus').textContent = 'Rebooted. Reconnecting...';
+    document.getElementById('rebootStatus').className = 'status success';
+    setTimeout(() => location.href = '/', 8000);
+  }).catch(() => {
+    document.getElementById('rebootStatus').textContent = 'Reboot sent (connection lost -- expected).';
+    document.getElementById('rebootStatus').className = 'status success';
+    setTimeout(() => location.href = '/', 8000);
+  });
+}
+function setupUpload(fileId, labelId, nameId, btnId, formId, progressId, fillId, statusId, url, onSuccess) {
+  var fi = document.getElementById(fileId);
+  if (!fi) return;
+  var lb = document.getElementById(labelId);
+  var nm = document.getElementById(nameId);
+  var bt = document.getElementById(btnId);
+  var fm = document.getElementById(formId);
+  var pg = document.getElementById(progressId);
+  var fl = document.getElementById(fillId);
+  var st = document.getElementById(statusId);
+  fi.addEventListener('change', function() {
+    if (this.files.length > 0) {
+      var f = this.files[0];
+      if (!f.name.endsWith('.bin')) { alert('Please select a .bin file'); this.value=''; return; }
+      nm.textContent = '\uD83D\uDCC4 ' + f.name + ' (' + (f.size/1024).toFixed(1) + ' KB)';
+      lb.classList.add('selected');
+      bt.disabled = false;
+    }
+  });
+  fm.addEventListener('submit', function(e) {
+    e.preventDefault();
+    var f = fi.files[0]; if (!f) return;
+    bt.disabled = true;
+    pg.style.display = 'block';
+    st.textContent = 'Uploading...';
+    st.className = 'status';
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', url, true);
+    xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+    xhr.upload.onprogress = function(ev) {
+      if (ev.lengthComputable) {
+        var pct = (ev.loaded / ev.total) * 100;
+        fl.style.width = pct + '%';
+        st.textContent = 'Uploading: ' + pct.toFixed(0) + '%';
+      }
+    };
+    xhr.onload = function() {
+      if (xhr.status === 200) {
+        try { var r = JSON.parse(xhr.responseText); } catch(x) {
+          st.textContent = '\u2717 Bad response'; st.className='status error'; bt.disabled=false; return; }
+        if (r.success) { onSuccess(r, st); }
+        else { st.textContent = '\u2717 ' + r.error; st.className='status error'; bt.disabled=false; }
+      } else { st.textContent = '\u2717 HTTP ' + xhr.status; st.className='status error'; bt.disabled=false; }
+    };
+    xhr.onerror = function() { st.textContent = '\u2717 Connection error'; st.className='status error'; bt.disabled=false; };
+    xhr.send(f);
+  });
+}
+setupUpload('otaFile','otaLabel','otaName','otaBtn','otaForm','otaProgress','otaFill','otaStatus',
+  '/api/update', function(r, st) {
+    st.textContent = '\u2713 Update successful! Rebooting...';
+    st.className = 'status success';
+    setTimeout(function() { location.href = '/'; }, 5000);
+});
+setupUpload('sdFile','sdLabel','sdName','sdBtn','sdForm','sdProgress','sdFill','sdStatus',
+  '/api/sdupload', function(r, st) {
+    st.textContent = '\u2713 Uploaded to SD card. Click Reboot Now to apply.';
+    st.className = 'status success';
+    if (r.crc32) document.getElementById('sdCrc').textContent = 'CRC32: ' + r.crc32 + '  Size: ' + r.size + ' bytes';
+});
+</script>{/literal}
+</body></html>

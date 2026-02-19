@@ -1,0 +1,2701 @@
+# eyeSPI Thermostat -- Project Documentation
+
+Firmware Version: 1.0
+
+
+## Supported Hardware
+
+### Tested Boards
+
+The following boards have been tested and compile successfully:
+
+  Board                         Network           Flash Used  RAM Used   Status
+  ----------------------------  ----------------  ----------  ---------  --------
+  Adafruit Feather M4 Express   W5500 Ethernet       33%         -       ✓ Tested
+  Adafruit Feather M4 CAN       W5500 Ethernet       33%         -       ✓ Tested
+  Adafruit Feather M0 WiFi      WINC1500 WiFi        73%         -       ✓ Tested
+  Adafruit Feather M0 Express   W5500 Ethernet       73%         -       ✓ Tested
+  Adafruit Feather RP2040       W5500 Ethernet        2%        9%       ✓ Tested
+  Adafruit Feather ESP32-S2     Native WiFi          38%       24%       ✓ Tested
+  Adafruit Feather ESP32-S2     Dual (PoE+WiFi)      39%       24%       ✓ Tested
+  Adafruit Feather ESP32-S2 TFT Native WiFi          38%       24%       ✓ Tested
+  Adafruit Feather ESP32-S3     Native WiFi          40%       25%       ✓ Tested
+  Adafruit Feather ESP32-S3     Dual (PoE+WiFi)      41%       25%       ✓ Tested
+  Adafruit Feather ESP32-S3 TFT Native WiFi          40%       25%       ✓ Tested
+  Adafruit Feather ESP32 V2     Dual (PoE+WiFi)      35%       19%       ✓ Tested
+  Adafruit Feather nRF52840     W5500 Ethernet       19%        9%       ✓ Tested
+  Adafruit Feather nRF52840 Sense W5500 Ethernet     19%        9%       ✓ Tested
+  Adafruit Feather STM32F405    W5500 Ethernet       10%       11%       ✓ Tested
+
+The ESP32-S2 Feather with BME280 (#5303) is an excellent choice as it
+includes the BME280 environmental sensor built-in.
+
+### Not Supported
+
+The following boards were evaluated but lack sufficient resources:
+
+  Board                  RAM      Required   Notes
+  ---------------------  -------  ---------  -------------------------
+  Arduino MEGA 2560      8 KB     ~24 KB     Tested; compiles but crashes
+  Feather 32u4           2.5 KB   ~24 KB     AVR architecture too limited
+  Arduino UNO/Nano       2 KB     ~24 KB     AVR architecture too limited
+
+The Arduino MEGA 2560 was specifically tested during development. While
+the code compiles, the board crashes at runtime due to insufficient RAM
+for the web server buffers, JSON parsing, and template rendering. AVR-
+based boards also lack the flash space for the full feature set.
+Additionally, AVR bootloaders do not support SD card firmware updates,
+so the SD-based update mechanism would not work even if RAM were
+sufficient.
+
+### Network Auto-Detection
+
+Board detection is automatic based on the target microcontroller:
+
+  Board                    Auto-Define   Network Medium
+  -----------------------  -----------   ------------------------------------
+  Feather M4 (SAMD51)      W5500         PoE-FeatherWing Ethernet
+  Feather M4 CAN (SAME51)  W5500         PoE-FeatherWing Ethernet
+  Feather RP2040           W5500         PoE-FeatherWing Ethernet
+  Feather M0 (SAMD21)      WINC1500      Built-in ATWINC1500 WiFi
+  Feather M0 Express       W5500         PoE-FeatherWing Ethernet
+  Feather ESP32-S2         ESP_WIFI      Native ESP32 WiFi
+  Feather ESP32-S3         ESP_WIFI      Native ESP32 WiFi
+  Feather ESP32 V2         ESP_WIFI      Native ESP32 WiFi
+  Feather nRF52840         W5500         PoE-FeatherWing Ethernet
+  Feather STM32F405        W5500         PoE-FeatherWing Ethernet
+
+To override auto-detection, add one of these at the very top of the
+sketch (before any #include):
+
+  #define W5500         // Force Ethernet (PoE-FeatherWing)
+  #define WINC1500      // Force ATWINC1500 WiFi
+  #define ESP_WIFI      // Force ESP32 native WiFi
+  #define DUAL_NETWORK  // ESP32 + PoE FeatherWing: both Ethernet and WiFi
+
+
+## Hardware Components
+
+- MCU: Adafruit Feather M4, M0 WiFi, RP2040, or ESP32-S2/S3
+- Networking: Silicognition PoE-FeatherWing (W5500) or built-in WiFi
+- Display adapter: eyeSPI breakout FeatherWing (custom PCB)
+- Display: Adafruit #2090 TFT (ILI9341 320x240 + CST826 capacitive touch + microSD)
+- Temperature: Adafruit MAX31865 PT100
+- Environment: BME680 or BME280 (optional, auto-detected at startup)
+
+
+## Component Temperature Limits
+
+For outdoor installations, be aware of component operating limits:
+
+  Component        Operating Range         Storage Range          Notes
+  ---------------  ----------------------  ---------------------  ------------------
+  PT100 sensor     -200°C to +850°C        Same                   Primary temp sensor
+  BME280/BME680    -40°C to +85°C          -40°C to +85°C         Accuracy degrades
+                   (-40°F to +185°F)                              below -20°C
+  ILI9341 TFT      -20°C to +70°C          -30°C to +80°C         LCD fluid may
+                   (-4°F to +158°F)        (-22°F to +176°F)      freeze below limit
+  microSD card     -25°C to +85°C          -40°C to +85°C         Standard cards
+  (standard)       (-13°F to +185°F)
+  microSD card     -40°C to +85°C          -40°C to +85°C         Kingston SDCIT,
+  (industrial)     (-40°F to +185°F)                              SanDisk Industrial
+
+For extreme cold environments (below -20°C / -4°F):
+- Use headless mode (no TFT display) or accept display limitations
+- BME sensor accuracy will degrade; PT100 remains accurate
+- Use industrial-rated microSD cards (Kingston SDCIT series recommended)
+- The firmware automatically disables BME below -30°F to prevent damage
+
+
+## GPIO Current Limits and BME Power Control
+
+For outdoor units in extreme cold, the BME280/BME680 should be powered down
+when temperature drops below -40°C to prevent sensor damage. This can be done
+by powering the sensor from a GPIO pin (simplest) or using a MOSFET switch.
+
+The firmware automatically handles power control when BME_POWER_PIN is set
+to a valid GPIO (e.g., A1) in Thermostat.ino. It uses the PT100 temperature
+to gate BME operation, powering off below -30°F (-34°C) for safety margin.
+
+### GPIO Source Current by Board
+
+  Board / MCU          Source Current    Sink Current    Notes
+  -------------------  ----------------  --------------  -------------------------
+  SAMD21 (M0)          7mA per pin       10mA per pin    14 high-drive pins: 10mA
+  SAMD51 (M4)          8mA per pin       8mA per pin     ~100mA total all GPIOs
+  RP2040               12mA per pin      12mA per pin    Configurable 2/4/8/12mA
+  nRF52840             5mA standard      5mA standard    High-drive mode: 15mA
+  STM32F405            8mA per pin       8mA per pin     25mA max on some pins
+  ESP32-S2/S3/V2       20mA per pin      20mA per pin    Recommended max 12mA
+
+### BME Sensor Power Consumption
+
+  Sensor     Sleep      Measuring    Peak         With Breakout Board
+  ---------  ---------  -----------  -----------  ----------------------
+  BME280     0.1µA      1.8µA        0.35mA       1-3mA (includes regulator)
+  BME680     0.15µA     2.1µA        12mA*        12-15mA (gas heater active)
+
+  * BME680 gas sensor heater draws up to 12mA during measurement
+
+### Power Control Options
+
+Option 1: Direct GPIO Power (BME280 only - recommended for simplicity)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The BME280 draws only 1-3mA with breakout board, which is within the GPIO
+current limits of ALL supported boards. Connect the sensor's VIN to GPIO A1:
+
+  Wiring:
+    BME280 VIN  →  GPIO A1
+    BME280 GND  →  GND
+    BME280 SDA  →  SDA
+    BME280 SCL  →  SCL
+
+  Firmware: Set BME_POWER_PIN to A1 in Thermostat.ino (around line 146)
+
+STEMMA QT / Qwiic Cable Modification:
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If using a STEMMA QT or Qwiic cable to connect the BME280 breakout, modify
+the cable by rerouting the power wire to GPIO A1.
+
+  Standard STEMMA QT / Qwiic Wire Colors:
+    Black   = GND (Ground)
+    Red     = VCC (3.3V Power)  ← REROUTE THIS WIRE
+    Blue    = SDA (I2C Data)
+    Yellow  = SCL (I2C Clock)
+
+  Modification Steps:
+    1. Cut the RED wire somewhere along the cable, or de-pin it from the
+       connector on the microcontroller end
+    2. Connect the BME280-side of the red wire to GPIO A1
+    3. Leave the controller-side of the red wire disconnected (tape off or
+       leave de-pinned)
+    4. Black, Blue, and Yellow wires remain connected normally
+
+  Result:
+    - GPIO A1 HIGH = BME280 receives 3.3V power = sensor ON
+    - GPIO A1 LOW  = BME280 power cut = sensor OFF (protected from cold)
+
+Option 2: MOSFET Switch (required for BME680 on nRF52840/SAMD21)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The BME680's 12mA gas heater current exceeds nRF52840 (5mA) and SAMD21 (7mA)
+GPIO limits. Use an N-channel MOSFET to switch the ground side:
+
+  Wiring:
+    MCU GPIO A1   →  10kΩ resistor  →  MOSFET Gate (2N7000)
+    BME680 GND    →  MOSFET Drain
+    MOSFET Source →  System GND
+    BME680 VIN    →  3.3V (always powered)
+
+  Note: HIGH = MOSFET conducts = BME680 GND connected = ON
+        LOW  = MOSFET off = BME680 GND floating = OFF
+
+  Firmware: Set BME_POWER_PIN to A1 in Thermostat.ino
+
+Option 3: Load Switch IC (cleanest but adds cost)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Use a dedicated load switch like TPS22918 for clean power control:
+- Handles higher currents (up to 2A)
+- Built-in inrush current limiting
+- Reverse current protection
+- Adds ~$0.50-1.00 to BOM
+
+### Board Compatibility Summary
+
+  Board              BME280 Direct GPIO    BME680 Direct GPIO    Notes
+  -----------------  --------------------  --------------------  ----------------
+  Feather M0         ✓ OK (7mA > 3mA)      ✗ NO (7mA < 12mA)     Use MOSFET
+  Feather M4         ✓ OK (8mA > 3mA)      ✗ NO (8mA < 12mA)     Use MOSFET
+  Feather RP2040     ✓ OK (12mA > 3mA)     ✓ OK (12mA = 12mA)    Borderline
+  Feather nRF52840   ✓ OK (5mA > 3mA)      ✗ NO (5mA < 12mA)     Use MOSFET
+  Feather STM32F405  ✓ OK (8mA > 3mA)      ✗ NO (8mA < 12mA)     Use MOSFET
+  Feather ESP32-S2   ✓ OK (20mA > 3mA)     ✓ OK (20mA > 12mA)    Plenty of margin
+  Feather ESP32-S3   ✓ OK (20mA > 3mA)     ✓ OK (20mA > 12mA)    Plenty of margin
+  Feather ESP32 V2   ✓ OK (20mA > 3mA)     ✓ OK (20mA > 12mA)    Plenty of margin
+
+Note: RP2040 is borderline for BME680 (12mA limit = 12mA draw). Consider
+using a MOSFET for reliability, especially at low temperatures.
+
+### ESP32-S2/S3 Feather I2C Power Control (PIN_I2C_POWER)
+
+The ESP32-S2 and ESP32-S3 Feathers define PIN_I2C_POWER (GPIO 7) which
+controls an LDO regulator powering:
+  - Onboard BME280 (if present, #5303)
+  - STEMMA QT connector (3.3V on red wire)
+  - NeoPixel LED
+
+The firmware automatically detects PIN_I2C_POWER and uses it for cold
+protection. No configuration needed on these boards.
+
+Important notes:
+  - PIN_I2C_POWER is defined on BOTH #5000 (no BME) and #5303 (with BME)
+  - When power control activates (below -30°F), the NeoPixel and any
+    external STEMMA QT devices will also lose power
+  - Rev B boards (older): LOW = power on, HIGH = power off
+  - Rev C boards (current): HIGH = power on, LOW = power off
+  - The Arduino board support package handles this automatically via
+    the PIN_I2C_POWER macro
+
+RECOMMENDATION: The ESP32-S2 Feather with BME280 (#5303) is NOT recommended
+for outdoor units where temperatures can fall below -40°C/-40°F. The
+integrated BME280 cannot be independently power-controlled without also
+disabling the STEMMA QT port and NeoPixel. For extreme cold outdoor units,
+use a standard ESP32-S2 Feather (#5000) with a separate BME280 breakout
+(#2652) wired to GPIO A1 for independent power control.
+
+
+## Parts List
+
+### Option A: PoE Ethernet (M4-Shim or RP2040-Shim)
+
+  Component               Source            Product
+  ----------------------  ----------------  ----------------------------------
+  PoE-FeatherWing         Tindie            silicognition/poe-featherwing
+  M4-Shim (SAMD51)        Tindie            silicognition/m4-shim
+  -- or RP2040-Shim       Tindie            silicognition/rp2040-shim
+  eyeSPI breakout FW      Custom PCB        github.com/ayourk/eyeSPI-FeatherWing-PCB
+  2.8" TFT EYESPI         Adafruit          #2090
+  PT100 RTD sensor        Adafruit          #3290
+  MAX31865 RTD amplifier  Adafruit          #3328
+  BME680 breakout         Adafruit          #3660 (optional)
+  -- or BME280 breakout   Adafruit          #2652 (optional)
+  Power Relay FeatherWing Adafruit          #3191 (optional)
+
+### Option B: WiFi with Feather M0 WiFi
+
+  Component               Source            Product
+  ----------------------  ----------------  ----------------------------------
+  Feather M0 WiFi         Adafruit          #3010 (built-in WINC1500)
+  eyeSPI breakout FW      Custom PCB        github.com/ayourk/eyeSPI-FeatherWing-PCB
+  2.8" TFT EYESPI         Adafruit          #2090
+  PT100 RTD sensor        Adafruit          #3290
+  MAX31865 RTD amplifier  Adafruit          #3328
+  BME680 breakout         Adafruit          #3660 (optional)
+  -- or BME280 breakout   Adafruit          #2652 (optional)
+  Power Relay FeatherWing Adafruit          #3191 (optional)
+
+### Option C: WiFi with ESP32-S2 (includes BME280!)
+
+  Component               Source            Product
+  ----------------------  ----------------  ----------------------------------
+  ESP32-S2 + BME280       Adafruit          #5303 (built-in WiFi + BME280)
+  eyeSPI breakout FW      Custom PCB        github.com/ayourk/eyeSPI-FeatherWing-PCB
+  2.8" TFT EYESPI         Adafruit          #2090
+  PT100 RTD sensor        Adafruit          #3290
+  MAX31865 RTD amplifier  Adafruit          #3328
+  Power Relay FeatherWing Adafruit          #3191 (optional)
+
+Note: The ESP32-S2 Feather with BME280 (#5303) is an excellent choice
+as it has the environmental sensor built-in, reducing component count.
+
+WARNING - Extreme Cold Outdoor Use: The integrated BME280 on #5303 cannot
+be power-cycled independently - it's powered directly from the 3.3V rail.
+For outdoor units in extreme cold climates (below -30°F / -34°C), use a
+standard ESP32-S2 Feather (#5000) with a separate BME280 breakout (#2652)
+wired to GPIO A1 for power control. See "GPIO Current Limits and BME Power
+Control" section for wiring details.
+
+### Option D: PoE Ethernet with ESP32-S2+BME280 (single-cable install)
+
+  Component               Source            Product
+  ----------------------  ----------------  ----------------------------------
+  ESP32-S2 + BME280       Adafruit          #5303 (BME280 built-in)
+  PoE FeatherWing         Adafruit          #5765
+  eyeSPI breakout FW      Custom PCB        github.com/ayourk/eyeSPI-FeatherWing-PCB
+  2.8" TFT EYESPI         Adafruit          #2090
+  PT100 RTD sensor        Adafruit          #3290
+  MAX31865 RTD amplifier  Adafruit          #3328
+  Power Relay FeatherWing Adafruit          #3191 (optional)
+
+This option provides single-cable installation (PoE = power + data) with
+the BME280 environmental sensor built-in. Requires adding `#define W5500`
+at line 1 of Thermostat.ino to override ESP_WIFI auto-detection and use
+the W5500 Ethernet chip on the PoE FeatherWing instead of WiFi.
+
+WARNING - Extreme Cold Outdoor Use: The integrated BME280 on #5303 cannot
+be power-cycled independently. For outdoor units in extreme cold climates
+(below -30°F / -34°C), use a standard ESP32-S2 Feather (#5000) with a
+separate BME280 breakout (#2652) wired to GPIO A1 for power control. See
+"GPIO Current Limits and BME Power Control" section for details.
+
+GPIO Usage for Option D (no conflicts):
+
+  Function          GPIO    Notes
+  ----------------  ------  -------------------------------------------
+  SPI SCK           36      Shared bus (W5500, TFT, SD, MAX31865)
+  SPI MOSI          35      Shared bus
+  SPI MISO          37      Shared bus
+  W5500 CS          10      PoE FeatherWing (standard Feather CS)
+  TFT CS            6       eyeSPI breakout
+  SD Card CS        5       eyeSPI breakout
+  MAX31865 CS       12      RTD amplifier
+  TFT DC            9       eyeSPI breakout
+  I2C SDA           3       BME280 (built-in, addr 0x77)
+  I2C SCL           4       BME280 (built-in)
+  Relay             13      Power Relay FeatherWing (configurable)
+  SD Card Detect    -1      Optional, use A0-A5 if needed
+
+All SPI devices share the bus with unique chip select pins. The ESP32-S2
+supports pin multiplexing, so no hardware conflicts exist.
+
+
+### Option D+: Dual Network (PoE + WiFi simultaneously)
+
+Same hardware as Option D, but with DUAL_NETWORK mode enabled. This
+provides access to the thermostat from both Ethernet (via PoE) and WiFi
+simultaneously. This provides access to the thermostat from both wired and
+wireless networks.
+
+Build with: `./build-all.sh esp32s2dual`
+
+Or manually add `#define DUAL_NETWORK` at line 1 of Thermostat.ino.
+
+Benefits:
+- Single-cable installation (PoE provides power)
+- Accessible from both network segments
+- Failover if one network goes down
+- Configure from either interface
+
+The firmware detects which interface you're connected via and applies
+network changes accordingly:
+- Save from Ethernet → WiFi changes apply immediately
+- Save from WiFi → Ethernet changes apply immediately
+- Restart applies all pending changes
+
+
+### Option E: Extreme Cold Outdoor Unit (with BME power control)
+
+For outdoor units in extreme cold climates (below -30°F / -34°C), use a
+standard Feather (without integrated BME) plus a separate BME280 breakout
+with GPIO power control. This allows the firmware to power-cycle the BME
+sensor to protect it from damage in extreme cold.
+
+  Component               Source            Product
+  ----------------------  ----------------  ----------------------------------
+  Feather M4 Express      Adafruit          #3857 (or other non-BME Feather)
+  -- or ESP32-S2 Feather  Adafruit          #5000 (without BME280)
+  -- or ESP32-S3 Feather  Adafruit          #5477
+  PoE FeatherWing         Adafruit          #5765 (or Tindie for M4/RP2040)
+  BME280 breakout         Adafruit          #2652 (separate, with power control)
+  eyeSPI breakout FW      Custom PCB        github.com/ayourk/eyeSPI-FeatherWing-PCB
+  2.8" TFT EYESPI         Adafruit          #2090
+  PT100 RTD sensor        Adafruit          #3290
+  MAX31865 RTD amplifier  Adafruit          #3328
+
+BME280 Power Control Wiring:
+  BME280 VIN  →  GPIO A1 (not 3.3V!)
+  BME280 GND  →  GND
+  BME280 SDA  →  SDA
+  BME280 SCL  →  SCL
+
+The firmware uses the PT100 (which works to -200°C) to monitor temperature
+and automatically powers down the BME280 when temperature drops below -30°F
+(-34°C), providing a 6°C safety margin above the sensor's -40°C limit.
+
+See "GPIO Current Limits and BME Power Control" section for wiring details
+and board compatibility.
+
+
+## DUAL_NETWORK Mode
+
+### Overview
+
+DUAL_NETWORK mode enables simultaneous Ethernet (W5500 via PoE FeatherWing)
+and WiFi (ESP32 native) connectivity. This is only available on ESP32
+boards because they have native WiFi that integrates with lwIP, allowing
+a single WiFiServer instance to accept connections from both interfaces.
+
+### Enabling DUAL_NETWORK
+
+Option 1: Use the build script
+  ./build-all.sh esp32s2dual    # ESP32-S2 + PoE
+  ./build-all.sh esp32s3dual    # ESP32-S3 + PoE
+  ./build-all.sh esp32v2dual    # ESP32 V2 + PoE
+
+Option 2: Manual
+  Add `#define DUAL_NETWORK` at line 1 of Thermostat.ino (before any
+  other code or includes), then compile for your ESP32 board.
+
+### Why ESP32 Only?
+
+The M0 WiFi uses a WINC1500 chip with its own network stack (WiFi101
+library). The M4/RP2040 boards paired with a PoE FeatherWing use the
+W5500 Ethernet chip, which has its own separate network stack.
+These two stacks don't integrate - you'd need two separate server
+instances, two client classes, and no shared sockets.
+
+ESP32 is different: both native WiFi and W5500 Ethernet (via PoE
+FeatherWing) use the same lwIP stack, so a single WiFiServer can
+accept connections from either interface transparently.
+
+### Configuration
+
+device.cfg keys for DUAL_NETWORK mode:
+
+  # Ethernet settings
+  ETH_IP=10.1.0.71           # or DHCP
+  ETH_DNS=10.1.0.1
+  ETH_SUBNET=255.255.255.0
+  ETH_GATEWAY=10.1.0.1
+  ETH_MAC=DE:AD:BE:EF:FE:ED  # Optional override
+
+  # WiFi settings  
+  WIFI_SSID=MyNetwork
+  WIFI_PASS=secret123
+  WIFI_SECURITY=WPA2
+  WIFI_IP=192.168.1.50       # or DHCP
+  WIFI_DNS=192.168.1.1
+  WIFI_SUBNET=255.255.255.0
+  WIFI_GATEWAY=192.168.1.1
+
+### Web Interface
+
+The /config page shows a tabbed interface:
+- Ethernet tab: IP, MAC, link status, static IP settings
+- WiFi tab: SSID, IP, MAC, RSSI, WiFi credentials, static IP settings
+
+An info box indicates which interface changes apply immediately vs
+or save from the other interface.
+
+### API
+
+/api/config accepts action "dual_network" with these keys:
+  eth_cfg_ip, eth_cfg_dns, eth_cfg_subnet, eth_cfg_gateway
+  wifi_ssid, wifi_pass, wifi_cfg_ip, wifi_cfg_dns, etc.
+
+/api/state returns nested network info:
+  {
+    "network": {
+      "mode": "dual",
+      "ethernet": { "ip": "...", "mac": "...", "link": "Connected" },
+      "wifi": { "ip": "...", "mac": "...", "ssid": "...", "rssi": -45 }
+    }
+  }
+
+### Template Variables (Network-Specific)
+
+These variables are available based on which network interfaces are
+compiled in. Use {$HAS_ETHERNET} and {$HAS_WIFI} to conditionally include
+them in templates.
+
+Ethernet variables (available when {$HAS_ETHERNET} = "1"):
+
+  Variable              Description
+  --------------------  ------------------------------------------
+  {$ETH_IP}              Ethernet current IP
+  {$ETH_MAC}             Ethernet MAC address
+  {$ETH_SUBNET}          Ethernet subnet mask
+  {$ETH_GATEWAY}         Ethernet gateway
+  {$ETH_DNS}             Ethernet DNS server
+  {$ETH_LINK}            "Connected" or "Disconnected"
+  {$ETH_CONNECTED}       "1" if connected, "0" otherwise
+  {$ETH_CFG_IP}          Configured static IP (empty = DHCP)
+  {$ETH_CFG_DNS}         Configured DNS server
+  {$ETH_CFG_SUBNET}      Configured subnet mask
+  {$ETH_CFG_GATEWAY}     Configured gateway
+  {$ETH_CFG_MAC}         Configured MAC override (empty if not set)
+
+WiFi variables (available when {$HAS_WIFI} = "1"):
+
+  Variable              Description
+  --------------------  ------------------------------------------
+  {$WIFI_IP}             WiFi current IP
+  {$WIFI_MAC}            WiFi MAC address
+  {$WIFI_SUBNET}         WiFi subnet mask
+  {$WIFI_GATEWAY}        WiFi gateway
+  {$WIFI_DNS}            WiFi DNS server
+  {$WIFI_LINK}           "Connected" or "Disconnected"
+  {$WIFI_CONNECTED}      "1" if connected, "0" otherwise
+  {$WIFI_SSID}           Currently connected SSID
+  {$WIFI_RSSI}           Signal strength in dBm
+  {$WIFI_SECURITY}       Current security type (WPA2, WPA, etc.)
+  {$WIFI_CFG_IP}         Configured static IP (empty = DHCP)
+  {$WIFI_CFG_DNS}        Configured DNS server
+  {$WIFI_CFG_SUBNET}     Configured subnet mask
+  {$WIFI_CFG_GATEWAY}    Configured gateway
+  {$WIFI_CFG_SSID}       Configured SSID
+  {$WIFI_CFG_PASS}       Configured password
+  {$WIFI_CFG_SECURITY}   Configured security type
+
+### Template Variables (all builds)
+
+  Variable              Description
+  --------------------  ------------------------------------------
+  {$IS_DUAL_NETWORK}     "1" if DUAL_NETWORK, "0" otherwise
+  {$HAS_ETHERNET}        "1" if Ethernet capable
+  {$HAS_WIFI}            "1" if WiFi capable
+  {$NETWORK_MODE}        "dual", "ethernet", "wifi", or "none"
+  {$ETH_CONNECTED}       "1" if Ethernet link is up
+  {$WIFI_CONNECTED}      "1" if WiFi is connected
+  {$CLIENT_INTERFACE}    "eth", "wifi", or "unkn" (per-request)
+  {$CLIENT_IS_ETH}       "1" if request came via Ethernet
+  {$CLIENT_IS_WIFI}      "1" if request came via WiFi
+
+
+### Common Notes
+
+The M0-Shim does not exist. For WiFi operation, use Option B (M0 WiFi) or
+Option C (ESP32-S2). For WiFi with PoE power, use Option D+ (ESP32 with
+PoE FeatherWing in DUAL_NETWORK mode).
+
+The Power Relay FeatherWing (#3191) provides a 10A/120VAC SPDT relay for
+controlling heating equipment. Solder the GPIO 13 jumper on the back of
+the relay wing (leftmost jumper in the top-left group of 3) and set
+RELAY_PIN to 13 in the firmware. The relay draws ~100mA from 3.3V when
+energized.
+
+
+## Building the Firmware
+
+### Using the Build Script (Recommended)
+
+The `build-all.sh` script automates compilation for all supported boards:
+
+  # Install dependencies (interactive prompts)
+  ./build-all.sh --install-deps
+  
+  # Build all primary boards
+  ./build-all.sh
+  
+  # Build specific board(s)
+  ./build-all.sh m4              # Feather M4 with W5500 Ethernet
+  ./build-all.sh esp32s2         # ESP32-S2 with WiFi
+  ./build-all.sh esp32s2dual     # ESP32-S2 with Dual Network (PoE+WiFi)
+  
+  # Build with verbose output (shows full compiler messages)
+  ./build-all.sh --verbose m4
+  ./build-all.sh -v esp32s2dual
+  
+  # List available boards
+  ./build-all.sh --help
+
+Output binaries are placed in the `binaries/` directory.
+
+On build failure:
+- Terminal shows last 20 lines of error
+- Full build log saved to `build/<board>/build-<board>.log`
+
+### Available Build Targets
+
+Primary boards (built by default with `./build-all.sh`):
+
+  Target        Board                      Network              Output
+  ----------    -----------------------    -------------------  ----------------
+  m4            Feather M4 Express         W5500 Ethernet       .bin
+  m0            Feather M0 WiFi            WINC1500 WiFi        .bin
+  rp2040        Feather RP2040             W5500 Ethernet       .uf2
+  esp32s2       Feather ESP32-S2           Native WiFi          .bin
+  esp32s3       Feather ESP32-S3           Native WiFi          .bin
+  esp32s2dual   Feather ESP32-S2           Dual: W5500 + WiFi   .bin
+
+Optional boards (specify explicitly):
+
+  Target          Board                      Network              Output
+  ----------      -----------------------    -------------------  ----------------
+  m0express       Feather M0 Express         W5500 Ethernet       .bin
+  m4can           Feather M4 CAN             W5500 Ethernet       .bin
+  esp32s2tft      Feather ESP32-S2 TFT       Native WiFi          .bin
+  esp32s3tft      Feather ESP32-S3 TFT       Native WiFi          .bin
+  esp32s3dual     Feather ESP32-S3           Dual: W5500 + WiFi   .bin
+  esp32v2dual     Feather ESP32 V2           Dual: W5500 + WiFi   .bin
+  nrf52840        Feather nRF52840           W5500 Ethernet       .zip
+  nrf52840sense   Feather nRF52840 Sense     W5500 Ethernet       .zip
+  stm32f405       Feather STM32F405          W5500 Ethernet       .bin
+
+Build examples:
+
+  ./build-all.sh                    # Build all primary boards
+  ./build-all.sh m4 esp32s2dual     # Build specific boards
+  ./build-all.sh all                # Build all boards (primary + optional)
+  ./build-all.sh all nrf52840       # Build all primary + nRF52840
+  ./build-all.sh -v esp32s2dual     # Verbose output
+
+### Manual Compilation (Arduino IDE)
+
+1. Install required board packages via Board Manager:
+   - Adafruit SAMD Boards (for M0, M4)
+   - Raspberry Pi Pico/RP2040 (for RP2040)
+   - esp32 by Espressif (for ESP32 variants)
+
+2. Install required libraries (see Required Libraries section below)
+
+3. Open Thermostat.ino in Arduino IDE
+
+4. For DUAL_NETWORK mode only: Add `#define DUAL_NETWORK` at line 1
+
+5. Select your board from Tools → Board menu
+
+6. Compile and upload
+
+
+## Required Libraries
+
+  Library               Purpose                       Install via
+  --------------------  ----------------------------  ----------------------
+  Adafruit_MAX31865     PT100 RTD temperature sensor  Arduino Library Manager
+  pt100rtd              RTD resistance-to-temp LUT    Arduino Library Manager
+  Adafruit_GFX          Graphics primitives for TFT   Arduino Library Manager
+  Adafruit_ILI9341      TFT display driver            Arduino Library Manager
+  Adafruit_FT6206       Capacitive touch (CST826)     Arduino Library Manager
+  Adafruit_Sensor       Unified sensor interface      Arduino Library Manager
+  Adafruit_BME680       BME680/688 environment        Arduino Library Manager
+  Adafruit_BME280       BME280 environment            Arduino Library Manager
+  ArduinoJson 6.x/7.x   JSON serialization for APIs   Arduino Library Manager
+  SdFat 2.x             SD card filesystem (exFAT)    Arduino Library Manager
+  Ethernet              W5500 Ethernet stack          Arduino Library Manager
+  WiFi101               WINC1500 WiFi stack           Arduino Library Manager
+  WiFi (ESP32)          ESP32 native WiFi             Included with ESP32 board package
+  InternalStorage       OTA updates (SAMD only)       Part of ArduinoOTA
+
+The firmware includes compile-time #error checks for all required
+libraries. If any library is missing, the compiler produces a clear
+error message naming the missing library and how to install it. The
+checks are grouped after all #include directives and before any code,
+so they fire early in the build process. Network-specific libraries
+(Ethernet for W5500, WiFi101 for WINC1500, WiFi for ESP32) are only
+checked when the corresponding board variant is active.
+
+Version-specific checks are enforced for:
+  ArduinoJson -- 6.x or 7.x supported (7.x recommended; uses JsonDocument
+                 with auto-sizing and to<JsonObject>() syntax)
+  SdFat       -- must be 2.x (v1 lacks typed file classes SdFat32/File32/
+                 ExFile/FsFile required by the SD_FAT_TYPE typedefs)
+
+ESP32 Compatibility Note:
+  The pt100rtd library requires a small modification for ESP32. In the
+  file ~/Arduino/libraries/pt100rtd/pt100rtd.h, replace the pgmspace
+  include section with:
+
+    #if defined(ESP32) || defined(ESP8266)
+      #include <pgmspace.h>
+    #elif defined(__AVR__) || defined(__arm__) || defined(__SAMD21__) || defined(__SAMD51__)
+      #include <avr/pgmspace.h>
+    #else
+      #ifndef PROGMEM
+        #define PROGMEM
+      #endif
+      #ifndef pgm_read_word_near
+        #define pgm_read_word_near(addr) (*(const uint16_t *)(addr))
+      #endif
+    #endif
+
+  The build script (build-all.sh --install-deps) applies this patch
+  automatically when installing dependencies.
+
+Additional header files (included in project):
+
+  LCD7segment48pt7b.h   7-segment font, 48pt (target temp)
+  LCD7segment72pt7b.h   7-segment font, 72pt (current temp)
+  favicon_ico.h         Embedded favicon for web server
+
+The embedded favicon is served from program memory (PROGMEM) via the
+/favicon.ico endpoint. At boot, the firmware attempts to write a copy
+to the SD card if one does not already exist. The SD version is served
+when available, falling back to PROGMEM (see SD Card Favicon under
+Fallback Page).
+
+
+## Operating Modes
+
+The firmware adapts to whatever hardware is present at boot. The combination
+of compile-time board detection and runtime sensor probing creates several
+distinct operating configurations.
+
+
+### Compile-Time Hardware Selection
+
+Board detection is automatic based on the target microcontroller. The
+appropriate network medium is selected at compile time:
+
+  Board                  Define     Default Network Medium
+  ---------------------  ---------  ------------------------------------
+  Feather M4 (SAMD51)    W5500      PoE-FeatherWing Ethernet
+  Feather RP2040         W5500      PoE-FeatherWing Ethernet
+  Feather M0 (SAMD21)    WINC1500   Built-in ATWINC1500 WiFi
+  Feather ESP32-S2       ESP_WIFI   Native ESP32 WiFi
+  Feather ESP32-S3       ESP_WIFI   Native ESP32 WiFi
+  Feather ESP32 V2       ESP_WIFI   Native ESP32 WiFi
+  Other / Unknown        (none)     No networking (LCD-only mode)
+
+No manual #define configuration is needed -- the board detection section
+automatically sets W5500, WINC1500, or ESP_WIFI based on the selected
+board in Arduino IDE.
+
+To override auto-detection (e.g., to use a WINC1500 FeatherWing on an M4),
+add one of these defines at the very first line of the sketch:
+
+  #define W5500      // Force Ethernet (PoE-FeatherWing)
+  #define WINC1500   // Force ATWINC1500 WiFi (WiFi101 library)
+  #define ESP_WIFI   // Force ESP32 native WiFi
+
+Boards that compile without networking hardware will operate in LCD-only
+mode with no web server functionality.
+
+Note: The Arduino MEGA 2560 is explicitly blocked at compile time. While
+it has sufficient flash, its 8KB RAM is inadequate for runtime operation
+(see "Not Supported" section above for details).
+
+
+### Runtime Detection
+
+These components are probed automatically at startup:
+
+  Component     Detection Method               Variable
+  ------------  -----------------------------  ----------------------
+  SD card       sd.begin() success/fail        sdCardPresent
+  TFT display   tft.begin() + readcommand8     displayPresent
+  BME680        bme680.begin() at 0x77         bme680Present
+  BME280        bme280.begin() at 0x77         bme280Present
+  Touch         ts.begin() in setup()          (only if displayPresent)
+
+The BME680 is probed first. If it fails, BME280 is probed at the same
+address. If neither is found, environment data (humidity, pressure, gas)
+is unavailable but the thermostat operates normally with PT100 temperature
+only.
+
+Both the BME680 and BME280 are rated for an operating range of -40°C to
++85°C (-40°F to +185°F). For outdoor units in extreme cold climates,
+be aware that full accuracy (±1.0°C for temperature, ±3% for humidity,
+±1 hPa for pressure) is specified over 0°C to +65°C (32°F to 149°F)
+only. Below 0°C (32°F), temperature accuracy drops to ±1.5°C and
+pressure accuracy to ±1.7 hPa. The sensors remain functional down to
+-40°C (-40°F) but readings may be less precise at the extremes.
+
+WARNING -- Damage Threshold: The BME280 and BME680 datasheets specify
+absolute maximum ratings (the point beyond which permanent damage may
+occur). Both sensors list a maximum storage/soldering temperature of
++300°C (+572°F) for brief reflow events, but the sustained operating
+range is strictly -40°C to +85°C (-40°F to +185°F). Exposing either
+sensor to temperatures below -40°C (-40°F) or above +85°C (+185°F)
+for extended periods risks permanent damage to the MEMS sensing
+elements, particularly the humidity sensor. The humidity sensor is the
+most fragile element: exceeding the operating range (even briefly, as
+during soldering) temporarily degrades its performance and requires
+reconditioning (see Bosch datasheet section 7.8).
+
+In environments where temperatures below -40°C (-40°F) are expected
+(such as -60°F / -51°C conditions), the BME sensor will be outside its
+absolute rated range and may suffer permanent calibration drift or
+failure. Consider a ventilated radiation shield (Stevenson screen) for
+the outdoor unit's sensor board. This protects the electronics and BME
+sensor from rain, snow, and direct solar radiation while allowing free
+airflow so the PT100 RTD reads true ambient air temperature. A sealed
+or insulated enclosure would trap heat and distort readings.
+
+Suitable enclosures:
+
+  - 3D-printed radiation shield -- louvered multi-plate design, white
+    ASA filament. PLA is not suitable for outdoor use as it deforms
+    above ~140°F (60°C) and becomes brittle below 0°C. PETG has
+    marginal heat resistance (Tg ~170°F) for direct sun exposure and
+    may become brittle in extreme cold. ASA is the only viable 3D
+    printing filament for this application: Tg ~212°F, excellent UV
+    resistance, and stable performance across the full +120°F to -60°F
+    operating range. Free STL models are available on Printables and
+    Thingiverse (search "Stevenson screen sensor"). Print in white to
+    reflect sunlight.
+    https://www.printables.com/model/202225
+    https://www.thingiverse.com/thing:1718334
+
+  - Pimoroni Weatherproof Cover / Stevenson Screen (#981114) -- a
+    commercial louvered enclosure sized for Raspberry Pi and small
+    sensor boards with cable pass-through and pole mount bracket.
+    https://shop.pimoroni.com/products/weatherproof-cover-for-outdoor-sensors
+
+  - BARANI MeteoShield Professional -- a helical radiation shield that
+    won the WMO intercomparison of thermometer screens in the Arctic.
+    Professional-grade accuracy, naturally ventilated, UV-stable.
+    Accepts sensors up to 18 mm diameter.
+    https://www.baranidesign.com/radiation-shields
+
+The PT100 RTD probe itself is rated to well below -50°C and is not
+the limiting factor -- the BME sensor and the electronics board are.
+In extreme arctic conditions (below -40°C / -40°F), the BME sensor
+will be outside its absolute rated range (see caution above). The
+radiation shield protects against solar heating bias during the day
+and radiative cooling at night, but cannot prevent damage from
+temperatures that exceed the sensor's absolute maximum ratings.
+
+Important: Do NOT use a sealed, insulated, or heated enclosure for
+the sensor probe. Any enclosure that restricts airflow or adds heat
+will cause the PT100 to read the enclosure temperature rather than
+the ambient air temperature. The PT100 lead wires should extend
+outside the radiation shield so only the sensing element is exposed
+to ambient air. The electronics board (Feather + PoE-FeatherWing +
+BME sensor) can be inside the shielded volume.
+
+The TFT display is detected by checking the ILI9341 chip ID via SPI.
+If no display is detected (displayPresent = false), all TFT draw calls
+are skipped, enabling headless operation for outdoor sensor units.
+
+
+### SD Card States
+
+  State                          sdCardPresent   Behavior
+  -----------------------------  --------------  ------------------------
+  Card present, usable FS,       true            Serve from SD, Smarty
+    index.html exists                            template processing
+  Card present, usable FS,       true            Generate default
+    no index.html                                index.html template to
+                                                 SD card, then serve via
+                                                 Smarty processing
+  Card present, usable FS,       true            Generation fails (write-
+    no index.html, write-                        protected or full); serve
+    protected or full                            firmware-embedded fallback
+                                                 page (same as no SD)
+  Card missing                   false           Serve firmware-embedded
+                                                 fallback page directly
+  Card present, bad format       false           Same as missing -- sd.begin()
+    (raw, corrupted, or                          fails, no file I/O possible
+    unsupported filesystem)
+
+The SD card filesystem type is set by SD_FAT_TYPE = 3 (SdFs), which
+supports all three filesystem types: FAT16, FAT32, and exFAT. Cards
+formatted with any of these filesystems are recognized. An unformatted
+or incompatibly formatted card (NTFS, ext4, HFS+, etc.) will fail
+sd.begin() and behave identically to a missing card.
+
+Hot-swap detection: The firmware periodically re-probes sd.begin() to
+detect card insertion or removal while running (controlled by the
+SD_REPROBE_INTERVAL_MS define, default 5000ms = 5 seconds).  When a
+card is inserted, the firmware detects it, checks for index.html, and
+reloads device.cfg.  When a card is removed, the firmware reverts to
+the built-in fallback page.  Set SD_REPROBE_INTERVAL_MS to 0 to
+disable hot-swap detection (probe only at boot).
+
+Many microSD card slots include a Card Detect (CD) mechanical switch
+that changes state when a card is inserted or removed. Note: The CD
+pin is NOT exposed through the eyeSPI 18-pin FPC ribbon connector.
+The eyeSPI standard carries SPI data/control signals (MOSI, MISO,
+SCK, TCS, DC, RST, SDCS, TSCS, MEMCS, etc.), power, I2C, backlight,
+and two GPIOs, but card detect is not among them. On some larger TFT
+FeatherWings (e.g., the 3.5" #3651), an SDDET pad is present on the
+PCB above the microSD slot but is not connected to any Feather pin by
+default -- it requires a manual solder bridge to a free GPIO. The 2.8"
+TFT EYESPI breakout (#2090) used in this project does not expose a
+separate CD pad; the only SD-related pin available through the eyeSPI
+connector is SDCS (chip select). The current firmware uses polling
+(periodic sd.begin() calls) rather than a CD pin interrupt.  If a
+future board revision provides a CD pin connection, it could be used
+for interrupt-driven detection instead of polling.
+
+GPIO availability for SDDET_PIN:
+
+The thermostat firmware uses the following pins: SPI bus (SCK, MOSI,
+MISO), TFT_CS (6), TFT_DC (9), SD_CS (4 or 5 depending on board),
+W5500_CS (10), MAX31865_CS (12), I2C (SDA/SCL for BME + MAC EEPROM),
+and touch interrupt. On the Feather M4 / M4-Shim (ATSAMD51, 21 GPIO),
+several pins remain free after all peripherals are assigned -- pins
+such as D0/RX, D1/TX, D5, D11, A0–A5 are available. Adding an
+interrupt-driven detection instead of polling.
+
+The relay output GPIO can be configured via device.cfg (RELAY_PIN=N) or
+the compile-time default (RELAY_PIN define, default 13 for GPIO 13).
+Set to any free pin for a MOSFET gate or relay module.  M4-class boards
+have enough headroom for both a CD pin and a relay pin simultaneously.
+Suggested pins: 13, A0–A3 on M4/M0; GPIO 24-29 on RP2040.
+device.cfg accepts: RELAY_PIN=14, RELAY_PIN=OFF, or RELAY_PIN=-1.
+
+Boards that may struggle with GPIO availability:
+
+  Board               Total GPIO  Concern
+  ------------------  ----------  ---------------------------------
+  Feather M0 WiFi     20 GPIO    WINC1500 uses several SPI + control
+    (ATSAMD21)                   pins internally; fewer free GPIOs
+                                 after TFT + SD + touch + BME.
+                                 SDDET + relay feasible but tight.
+  RP2040-Shim         ~16 GPIO   Custom pin mapping for compact PCB;
+                                 verify free pins after PoE-FeatherWing
+                                 stack. May require creative pin
+                                 sharing or omitting one feature.
+  ESP32-S2 / S3       ~20 GPIO   GPIO-rich but many pins have
+                                 restrictions (strapping, input-only).
+                                 Native WiFi means no SPI conflict.
+                                 SDDET + relay should fit easily.
+                                 ESP32-S2+BME280 (#5303) has sensor
+                                 built-in, freeing I2C for other uses.
+
+
+### Common Configurations
+
+  1. Full Indoor Unit (typical)
+     W5500 + PT100 + BME680 + TFT + SD card
+     All features: web UI, template engine, outdoor polling, LCD display,
+     environment monitoring, persistent config
+
+  2. Full Indoor Unit -- No SD Card
+     W5500 + PT100 + BME680 + TFT (no SD)
+     Web UI served from firmware, no persistent config (outdoor settings
+     lost on reboot), /config page shows SD card warning
+
+  3. Headless Outdoor Unit
+     W5500 + PT100 + BME680 (no TFT, or TFT not detected)
+     Same firmware, no outdoor unit configured. Serves /outdoorjson for
+     a remote indoor unit to poll. All TFT calls skipped.
+
+  4. Minimal -- No Network
+     (no W5500/WINC1500) + PT100 + TFT
+     Standalone thermostat, LCD display only, no web interface,
+     no outdoor polling. Stub network classes compile in for the
+     web server code but never serve requests.
+
+  5. WiFi Variant
+     WINC1500 or ESP32 + PT100 + BME680 + TFT + SD card
+     Same functionality as #1 but over WiFi instead of PoE Ethernet.
+     Credentials stored in device.cfg; use WIFI_SSID and WIFI_PASS keys.
+     The Feather M0 WiFi includes a LiPoly battery connector and a
+     voltage divider on pin A7 for battery monitoring. ESP32 boards
+     have built-in WiFi and do not require an external WiFi chip.
+
+  6. Dual Network (ESP32 + PoE)
+     ESP32 + PoE FeatherWing (W5500) + PT100 + BME280 + TFT + SD card
+     Accessible from both Ethernet and WiFi simultaneously. Single-cable
+     installation via PoE with WiFi backup/secondary access. Requires
+     DUAL_NETWORK build. See "Option D+" in Hardware Components and
+     "DUAL_NETWORK Mode" section for details.
+
+
+## Heat Control Logic
+
+The thermostat controls a heating system with the following state variables:
+
+  Variable           Type            Default   Description
+  -----------------  --------------  --------  ----------------------------------
+  isHeatOn           bool            true      Heat mode enabled (user toggle)
+  isCurHeatOn        bool            false     Heat currently calling (relay on)
+  targIndoorTemp     int             71        Target temperature in °F
+  curIndoorTemp      double          71.0      Current temperature in °F
+  lastHeatChange     unsigned long   0         millis() of last relay state change
+  lastChangeWasUser  bool            false     true if last change was user-initiated
+  userDebounce       const (5s)      5000      Hold time after user adjustment
+  minRunTime         const (3min)    180000    Minimum relay ON time (auto)
+  minOffTime         const (3min)    180000    Minimum relay OFF time (auto)
+
+Temperature adjustments are made via the TFT touch interface (Region 3
+to decrease, Region 4 to increase -- see Touch Zones) or the REST API
+(/api/set?target=N). The heat mode toggle is available on Region 2
+(see Touch Zones) or via /api/set?heat=on|off.
+
+Relay output: Set RELAY_PIN in device.cfg (e.g., RELAY_PIN=14) or change
+the compile-time default.  The pin drives HIGH when heat is on, LOW when
+off.  The compile-time default is GPIO 13 (for Adafruit Power Relay
+FeatherWing); set RELAY_PIN=-1 or RELAY_PIN=OFF in device.cfg to disable.
+
+
+### Dual-Mode Comparison
+
+The relay decision uses two different comparison modes depending on
+whether the user recently changed the target temperature.
+
+User-initiated (lastChangeWasUser = true):
+
+  Relay turns ON when curIndoorTemp < targIndoorTemp. No hysteresis band
+  is applied. If the display shows Inside: 72 and Target: 73, the relay
+  engages (after the debounce hold) because 72 < 73. What the user sees
+  on screen matches what the thermostat does.
+
+Automatic / temperature drift (lastChangeWasUser = false):
+
+  A 1°F hysteresis band prevents short-cycling. When the relay is OFF,
+  it will not turn ON until curIndoorTemp < (targIndoorTemp - 1). When
+  the relay is ON, it stays on until curIndoorTemp >= targIndoorTemp.
+  Example with target 73: relay turns on when temp drops below 72, and
+  stays on until temp reaches 73.
+
+The lastChangeWasUser flag is set to true whenever the user presses +/-
+on the TFT or sets a target via the REST API. The flag is cleared to
+false when the relay next changes state on its own (temperature drift
+crosses a threshold), switching future cycles back to hysteresis mode.
+
+
+### Dual-Timer Short-Cycle Protection
+
+After any relay state change, a hold timer prevents the relay from
+toggling again until a minimum period has elapsed. The hold duration
+depends on what caused the last change.
+
+User-initiated hold (lastChangeWasUser = true):
+
+  5-second debounce. Lets the user finish pressing +/- without the relay
+  toggling on every button press. The timer restarts on each press.
+
+Automatic hold (lastChangeWasUser = false):
+
+  3-minute furnace protection. Applies separately to both ON->OFF and
+  OFF->ON transitions. Prevents the compressor or gas valve from rapid
+  cycling which can cause mechanical wear and reduce efficiency.
+
+The hold works by overriding the shouldHeat decision: if the relay is ON
+and the hold has not expired, it stays ON even if the temperature has
+reached the set point. If the relay is OFF and the hold has not expired,
+it stays OFF even if the temperature has dropped below the threshold.
+
+
+### Relay Decision Summary
+
+  Step  Action
+  ----  -------------------------------------------------------------
+  1     Compute shouldHeat using the active comparison mode
+        (user-initiated = simple, automatic = hysteresis)
+  2     If a hold timer is active, override shouldHeat to maintain
+        the current relay state until the hold expires
+  3     If shouldHeat differs from isCurHeatOn, record the state
+        change time and clear lastChangeWasUser to false
+  4     Set isCurHeatOn = shouldHeat
+
+
+## Touch Zones (TFT and Canvas Interactive Regions)
+
+The TFT display and web canvas are divided into four touch regions. The
+layout mirrors the physical FocusPro TH5110D button placement. Touch
+regions extend to the screen edges and meet at the center, forming a
+checkerboard pattern. The drawn Light and System boxes are visual only;
+the touch targets fill the entire quadrant.
+
+  +------------------------+------------------------+
+  |                        :                        |
+  |   Region 1             :   Region 2             |
+  |   (Inside area)        :   (Heat Setting area)  |
+  |                        :                        |
+  +- - - - - - - - - - - - +- - - - - - - - - - - - +
+  |   +--- Light ---+      :   +--- System ---+     |
+  |   |  Region 3   |      :   |  Region 4    |     |
+  |   |  (- target) |      :   |  (+ target)  |     |
+  |   +-------------+      :   +--------------+     |
+  |                        :                        |
+  +------------------------+------------------------+
+
+  --- solid  = screen edge / drawn LCD outlines
+  - - dashed = touch region boundaries (not drawn on screen)
+  :   dotted = vertical region split (not drawn on screen)
+
+  Region   Location                    Action
+  -------  --------------------------  ----------------------------------
+  1        Top-left quadrant           Toggle settings overlay on/off
+  2        Top-right quadrant          Toggle heat mode on/off
+  3        Bottom-left (full width)    Decrease target temp by 1
+  4        Bottom-right (full width)   Increase target temp by 1
+
+Regions 3 and 4 stretch all the way to the left and right screen edges
+respectively, and meet each other at the horizontal center of the
+screen. Regions 1 and 2 similarly span the full top half.
+
+Canvas coordinates for the web fallback page:
+
+  Region   Canvas Coordinates          API Call
+  -------  -------------------------   ---------------------------------
+  1        (15,0) – (155,~145)         /api/set?settings=toggle
+  2        (170,0) – (310,~145)        /api/set?heat=toggle (on->off->on)
+  3        (15,~145) – (155,235)       /api/set?target=N-1
+  4        (170,~145) – (310,235)      /api/set?target=N+1
+
+Note: The vertical split (~145) is dynamic on the TFT because it depends
+on the bounding box of the large 7-segment temperature digits. On the
+web canvas, the coordinates are fixed.
+
+Region 1 (settings toggle) is the only touch zone that works regardless
+of whether the settings overlay is currently displayed -- tapping it always
+toggles the overlay. Regions 2–4 are ignored while the overlay is visible.
+
+
+## Settings Overlay (TFT / Canvas)
+
+Triggered by tapping Region 1 (the Inside area above the Light button),
+or via the REST API with /api/set?settings=toggle.
+
+Dimensions: Full-screen overlay on the 320x240 TFT.
+
+The overlay layout differs depending on the network variant (Ethernet,
+WiFi, or Dual Network). All variants use FreeSansBold9pt7b for section
+headers and FreeSans9pt7b for body text (two fonts total).
+
+### Ethernet Variant (W5500 via PoE FeatherWing)
+
+Single-column layout with yellow (#FFFF00) accent color:
+
+  +---------------------------------------------------+
+  |  Network Settings                       Ethernet  |
+  |  ===============================================  |
+  |  Board:    Adafruit Feather M4 (PoE Ethernet)     |
+  |  IP:       10.1.0.50                              |
+  |  Subnet:   255.255.255.0                          |
+  |  Gateway:  10.1.0.1                               |
+  |  MAC:      0E:AD:BE:EF:FE:E0                      |
+  |  Link:     Connected                              |
+  |  SD:       Present                                |
+  |  -----------------------------------------------  |
+  |  Outdoor Unit                                     |
+  |  Remote:   10.1.0.72:80                           |
+  |  Status:   Online  23F                            |
+  |                                                   |
+  |           Tap anywhere to close                   |
+  +---------------------------------------------------+
+
+Link status uses conditional coloring (green = Connected, red =
+Disconnected).
+
+### WiFi Variant (WINC1500 or ESP32)
+
+Two-column layout with blue (#60A5FA) accent color. SSID and Board are
+full-width to allow long strings to display fully:
+
+  +---------------------------------------------------+
+  |  Network Settings                           WiFi  |
+  |  ===============================================  |
+  |  SSID:     ThermoNet-5G-Long-Name-Trunca...       |
+  |  Board:    M0 WiFi (WINC1500)                     |
+  |  IP:       10.1.0.51     |  SD:       Present     |
+  |  Subnet:   255.255.255.0 |  Battery:  3.94V       |
+  |  Gateway:  10.1.0.1      |  Uptime:   2d 5h       |
+  |  MAC:      4A:3B:2C:1D:0E:FF                      |
+  |  Security: WPA2          |  RSSI:     -42 dBm     |
+  |  -----------------------------------------------  |
+  |  Outdoor Unit                                     |
+  |  Remote:   10.1.0.72:80                           |
+  |  Status:   Online  23F  78.1%                     |
+  |                                                   |
+  |           Tap anywhere to close                   |
+  +---------------------------------------------------+
+
+Field labels are grey (#AAA), values are white. Status values use
+color coding (green = Online, red = Offline/Error, grey = N/A).
+
+SSID truncation: If the connected SSID is too wide for the available
+space on the TFT canvas, it is truncated with an ellipsis (...).
+
+### Dual Network Variant (ESP32 + PoE FeatherWing)
+
+Uses a 3-touch cycle to show both interfaces:
+
+  Touch 1 → Ethernet overlay (yellow border)
+  Touch 2 → WiFi overlay (blue border)
+  Touch 3 → Close back to thermostat display
+
+The Ethernet and WiFi overlays use the same layout as their single-
+interface counterparts (described above), with only the footer text
+changed to indicate the next action:
+
+  - Ethernet overlay footer: "Tap for WiFi"
+  - WiFi overlay footer: "Tap anywhere to close"
+
+### Touch Behavior
+
+When the settings overlay is displayed, tapping anywhere on the screen
+cycles through the overlay states. In single-interface mode, this
+toggles the overlay on/off. In Dual Network mode, this cycles through
+Ethernet → WiFi → Close.
+
+
+## Web Pages
+
+  Endpoint        Source      Description
+  --------------  ----------  ------------------------------------------
+  /               SD or FW    Main thermostat UI (live canvas + cards)
+  /config         Firmware    Network + outdoor configuration (GET forms)
+  /update         Firmware    OTA firmware update page (drag-and-drop)
+  /sdfiles        Firmware    SD card file manager (browse/edit/delete)
+
+
+### Fallback Page (Firmware-Embedded)
+
+When no SD card is present (or the SD card filesystem is unusable), the
+firmware serves a built-in single-page application with:
+
+  - HTML5 canvas (320x240) rendering the FocusPro LCD layout with
+    7-segment digits for current and target temperature
+  - Live polling: JavaScript fetches /api/state every 5 seconds and
+    redraws the canvas without full page reloads
+  - Interactive canvas: click/touch regions mapped to thermostat controls
+    (see Touch Zones above)
+  - Environment cards: dynamically built from /api/state JSON data showing
+    indoor BME sensor readings, network info, uptime, and outdoor unit
+    status when configured
+  - Connection status indicator: green dot (connected), yellow (retrying),
+    red (disconnected after 3 consecutive failures)
+  - Initial state seed: server-side values are baked into the page on load
+    so the canvas renders immediately without waiting for the first fetch
+
+The fallback page requires no SD card and no external dependencies. All
+JavaScript is embedded in the firmware.
+
+
+### SD Card Favicon
+
+When an SD card is present, the firmware attempts to write the
+embedded favicon (from favicon_ico.h / PROGMEM) to /favicon.ico on
+the card if the file does not already exist. This happens once at boot,
+immediately after the index.html generation check. The write may fail
+silently if the card is write-protected. Once written, the user can
+edit or replace the file with a custom icon.
+
+On subsequent requests to /favicon.ico, the firmware checks the SD
+card first (via serveSDFile). If found, the SD file is served with
+Content-Type image/x-icon. If the SD card is absent or the file
+cannot be opened, the PROGMEM-embedded copy is served as a fallback
+(in 70-byte chunks via memcpy_P).
+
+
+### SD Card File Manager (/sdfiles)
+
+The /sdfiles page provides a web-based file manager for the SD card,
+accessible when an SD card is present. Features:
+
+  - Browse: Navigate directories with breadcrumb trail navigation
+  - Download: Click any file to download with proper Content-Disposition
+  - Edit: Text files (html, css, js, json, cfg, txt, log, csv, ini, xml,
+    md, yml, yaml, conf, h, c, cpp) open in an in-browser editor
+  - Delete: Remove files and empty directories (with confirmation)
+  - Upload: Upload new files to the current directory (max 64KB)
+  - Format: Format the entire SD card (FAT32, with confirmation dialog)
+  - New File: Create new empty text files for editing
+
+The interface shows file sizes, total/free space, and filesystem type.
+All operations use the /api/sd* endpoints (see SD Card Management API).
+
+Security: Path traversal is blocked (rejects paths containing "..").
+
+
+## Firmware Updates
+
+
+### OTA Updates (Network -- SAMD Only)
+
+Available on SAMD architecture boards (Feather M4, Feather M0) via the
+ArduinoOTA InternalStorage library.
+
+  Endpoint           Method   Description
+  -----------------  -------  ------------------------------------------
+  /update            GET      Drag-and-drop upload page
+  /api/update        POST     Binary firmware upload (chunked, 256 bytes)
+
+Upload process:
+  1. Navigate to http://<device-ip>/update
+  2. Drag a compiled .bin file onto the drop zone (or click to browse)
+  3. File is validated (minimum 1000 bytes)
+  4. Firmware is uploaded in 256-byte chunks to InternalStorage
+  5. On success, InternalStorage.apply() reboots the board
+
+Timeouts: 30-second connection timeout, 5-second chunk timeout.
+
+The template variable {$OTA_SUPPORTED} resolves to "1" on SAMD boards
+and "0" on all others, allowing SD card templates to conditionally show
+or hide the update link.
+
+
+### SD Card Updates (UPDATE.bin -- All Boards)
+
+As an alternative to network OTA (and as the only update path for RP2040
+and ESP32 boards), the firmware can be updated by placing a compiled
+binary on the SD card.
+
+Update process (manual):
+  1. Compile firmware in Arduino IDE: Sketch -> Export Compiled Binary
+  2. Rename the resulting .bin file to UPDATE.bin
+  3. Place UPDATE.bin in the SD card root directory (via card reader or
+     the web upload feature described below)
+  4. Reboot the thermostat (power cycle, reset button, or the web-based
+     reboot button described below)
+  5. On boot, the firmware detects UPDATE.bin and applies the update
+  6. Attempt to rename UPDATE.bin to UPDATE.bak to prevent repeated
+     flashing on subsequent boots (see CRC32 Checksum below for the
+     case where rename fails, e.g. write-protected card)
+
+Web-based SD upload and reboot:
+
+For boards without OTA support (RP2040, ESP32), the /update page offers
+an "Upload to SD Card" section alongside the existing OTA upload (when
+OTA is available). This avoids requiring the user to physically remove
+the SD card to place UPDATE.bin on it.
+
+**Recommendation:** Firmware uploads should be performed over a reliable
+connection. Ethernet is preferred over WiFi due to potential packet loss
+or signal drops during the upload. USB serial upload via Arduino IDE is
+the most reliable method when physical access is available.
+
+  Endpoint              Method   Description
+  --------------------  -------  ------------------------------------------
+  /update               GET      Combined update page (shows OTA section
+                                 if SAMD, always shows SD upload section
+                                 if SD card is present and writable)
+  /api/sdupload         POST     Upload file to SD card root as UPDATE.bin
+  /api/reboot           GET      Trigger a software reboot (separate action)
+
+Upload process (web):
+  1. Navigate to http://<device-ip>/update
+  2. In the "SD Card Firmware Update" section, drag a compiled .bin file
+     onto the SD upload drop zone (or click to browse)
+  3. File is streamed in chunks to the SD card as UPDATE.bin
+  4. After writing, the firmware computes a CRC32 of the written file
+     and compares it against the CRC32 computed during the upload
+     stream. If the checksums do not match, the file is deleted and
+     an error is returned. This guards against SD card write errors,
+     corrupted uploads, or filesystem issues.
+  5. On success, a confirmation message is shown with the verified CRC32
+     and a "Reboot Now" button (reboot is intentionally a separate
+     action so the user can verify the upload or upload additional
+     files before rebooting)
+  6. The verified CRC32 is also written to UPDATE.crc alongside the
+     .bin file. This allows the bootloader to perform a quick CRC
+     comparison on the next boot without re-reading the entire binary.
+  7. Clicking "Reboot Now" calls /api/reboot, which triggers a software
+     reset (NVIC_SystemReset() on SAMD, rp2040.reboot() on RP2040,
+     ESP.restart() on ESP32)
+  8. On reboot, the normal SD card update process runs: detect
+     UPDATE.bin, verify CRC32 against EEPROM, flash if different,
+     attempt to rename to .bak
+
+The reboot button is always available on the /update page regardless of
+whether a file was just uploaded, allowing the user to trigger a reboot
+at any time (e.g. after placing UPDATE.bin on the card manually).
+
+The /api/sdupload endpoint requires an SD card to be present and
+writable. If no SD card is detected, the endpoint returns an error and
+the upload section is hidden on the /update page. The template variable
+{$SD_CARD} can be used to conditionally show/hide the SD upload section
+in custom templates.
+
+Board-specific mechanisms:
+
+  Board              Method                 Library / Notes
+  -----------------  ---------------------  ------------------------------
+  SAMD51 (M4)        SDU library            Arduino SDU (Secure Digital
+                                            Update); #include <SDU.h>
+                                            triggers automatic UPDATE.bin
+                                            check at boot
+  SAMD21 (M0 WiFi)   SDU library            Same as M4
+  RP2040             Application-level      Read UPDATE.bin, write to
+                                            flash via rp2040.rebootToBootloader()
+                                            or Pico SDK flash routines
+  ESP32              Update library         Update.begin() + writeStream()
+                                            from SD card file (same API as
+                                            ESP32 SD_Update example)
+
+For SAMD boards, including the SDU library is sufficient -- the library
+inserts boot-time code that checks for UPDATE.bin before setup() runs.
+For ESP32 and RP2040, the check must be implemented explicitly in setup()
+before any other initialization.
+
+
+### CRC32 Checksum -- Preventing Repeated Flashing
+
+To prevent constant reflashing of the same firmware on every boot (when
+UPDATE.bin is not renamed, or the rename fails on a write-protected card),
+the firmware stores a CRC32 checksum of the currently-running binary in
+EEPROM (or flash-emulated EEPROM).
+
+On boot, the update process:
+  1. Compute CRC32 of the UPDATE.bin file on SD card
+  2. Read the stored CRC32 of the currently-running firmware from EEPROM
+  3. If the two checksums match, skip the update (firmware is identical)
+  4. If they differ, apply the update, then store the new CRC32 in EEPROM
+  5. Attempt to rename UPDATE.bin to UPDATE.bak
+
+The CRC32 is computed using the standard polynomial (0xEDB88320, same as
+zlib/Ethernet CRC). SAMD boards have built-in CRC32 hardware via the DSU
+peripheral. Other boards compute it in software using a table-driven
+algorithm. The stored checksum uses 4 bytes of EEPROM at a fixed address.
+
+A companion file UPDATE.crc (containing the hex CRC32 string) can
+optionally be placed alongside UPDATE.bin. If present, the firmware
+compares the file's CRC against the stored running checksum before
+reading the full binary, allowing early skip without computing the
+CRC over the entire file. If UPDATE.crc is absent, the firmware
+computes the CRC from the .bin file directly.
+
+
+
+
+## Smarty Template Engine
+
+HTML files stored on the SD card serve a dual purpose: they are valid,
+parseable HTML that can be opened directly in a browser for preview, and they
+are also embedded Smarty template files processed by the firmware at serve
+time. The firmware reads the file line-by-line (max 256 chars/line), evaluates
+Smarty tags, substitutes variables, and streams the result to the HTTP client.
+
+If the SD card is usable but no index.html exists, the firmware attempts to
+generate a default index.html template onto the SD card at boot (the write
+may fail if the card is write-protected). This generated file contains Smarty
+variables and a complete live-canvas interface, ready for the user to edit or
+customize. If no SD card is detected at all, the firmware serves its built-in
+fallback page on every request.
+
+
+### Template Syntax
+
+The engine implements a subset of the Smarty PHP template language:
+
+  Variable substitution:
+    {$VARIABLE_NAME}                  Replaced with live firmware value
+
+  Conditional blocks:
+    {if $VAR}...{/if}                 Truthy test (non-empty, non-"0")
+    {if $VAR == "value"}...{/if}      String equality
+    {if $VAR != "value"}...{/if}      String inequality
+    {if $VAR > 50}...{/if}            Numeric comparison
+    {if $VAR}...{elseif $VAR2}...{else}...{/if}   Full branching
+
+  Comparison operators:
+    ==  !=  >  >=  <  <=              Symbol form
+    eq  ne  gt  ge  lt  le            Word form
+
+  Variable-to-variable comparison:
+    {if $CURRENT_TEMP > $TARGET_TEMP}...{/if}
+
+  Literal braces (for JavaScript etc.):
+    {ldelim}    outputs {
+    {rdelim}    outputs }
+
+  Literal blocks (passthrough without processing):
+    {literal}...{/literal}            Everything between is output verbatim
+
+  {literal} is only needed around blocks that contain bare { } characters
+  that would otherwise be interpreted as Smarty tags -- typically <style>
+  and <script> blocks.  Plain HTML with inline style="..." attributes
+  does not need {literal} because the template engine only looks for { }
+  at the top level of a line, not inside quoted attribute values.  Smarty
+  tags like {$VAR} and {if} work normally outside {literal} blocks even
+  when surrounded by HTML tags.  Do not wrap individual HTML elements in
+  {literal} -- it makes templates harder to read for no benefit.
+
+  Comments (stripped from output):
+    {* This is a comment *}           Single-line or inline comment
+
+  Nesting:
+    {if} blocks can be nested up to 8 levels deep.
+    {if} blocks can span multiple lines.
+
+  Loops:
+    {foreach $ARRAY as $item}           Iterate over an array variable
+      {$item.field}                     Access a field on the current item
+      {$item@index}                     Current iteration (0-based)
+      {$item@count}                     Total number of items
+      {$item@first}                     "1" on first iteration, "0" otherwise
+      {$item@last}                      "1" on last iteration, "0" otherwise
+    {foreachelse}                       Content shown when array is empty
+    {/foreach}
+
+  Available arrays:
+    WIFI_NETWORKS (WINC1500 only) -- WiFi scan results with fields:
+      .ssid    Network name (string)
+      .rssi    Signal strength in dBm (integer)
+      .enc     Encryption type: WPA2, WPA, WEP, Open, or Auto
+
+  The WiFi scan is performed once per template render (cached).
+  Results are sorted by RSSI descending (strongest first) via
+  wifiScanSorted(). The firmware buffers networks based on board RAM:
+  ESP32/RP2040=64, M4=48, M0=24 (TPL_MAX_FOREACH_ITEMS); the WiFi
+  library itself has no fixed limit.
+
+  {foreach} is one level deep (no nested foreach). The loop body
+  is buffered (up to 64 lines) and replayed for each item. {if}
+  blocks inside {foreach} work normally.
+
+
+### HTML Safety for Smarty Tags
+
+Because template files must also be valid HTML, Smarty comment tags should
+be wrapped in HTML or JavaScript comment delimiters so that browsers and
+HTML validators ignore them:
+
+  In HTML context:    <!-- {* comment text *} -->
+  In JS context:      /* {* comment text *} */
+
+IMPORTANT: Nested HTML comments do not work.  <!-- outer <!-- inner --> -->
+will close at the first --> and leave stray text in the page.  Use Smarty
+comments {* ... *} for nesting instead, wrapped in a single HTML comment
+if needed for browser safety: <!-- {* outer {* inner *} still comment *} -->
+
+As a general rule, any time an HTML tag block needs to contain { or } in
+its content, wrap the entire block -- including the opening and closing tags
+themselves -- in {literal}...{/literal}.  The most common cases are <style>
+and <script> blocks, since CSS and JavaScript both use curly braces as part
+of their syntax:
+
+  {literal}<style>
+    .card { background: #1a1a2e; border-radius: 8px; }
+  </style>{/literal}
+
+  {literal}<script>
+    function update() { fetch('/api/state').then(r => r.json()).then(render); }
+  </script>{/literal}
+
+The same applies to any other tag whose content contains literal braces,
+such as <pre> or <code> blocks displaying code samples or JSON.
+
+Avoid using { or } inside inline attributes (e.g., style="...",
+onclick="...").  The template engine will attempt to parse them as Smarty
+tags, and {literal} cannot protect content inside an attribute value.  Move
+CSS rules into a <style> block and event handlers into a <script> block
+instead, where {literal} can wrap the entire tag.
+
+For script blocks that also need Smarty variable access, use two separate
+<script> tags.  The first contains Smarty variable declarations (processed
+by the engine), and the second is wrapped in {literal} for pure JavaScript
+with no template processing:
+
+  <script>
+    var currentTemp = {$CURRENT_TEMP};
+    var outdoorAvail = {$OUTDOOR_AVAILABLE};
+  </script>
+  {literal}<script>
+    // JavaScript can use { } freely here -- no Smarty processing
+    function render() {
+      if (outdoorAvail) { document.getElementById('outdoor').style.display = 'block'; }
+    }
+    setInterval(() => { fetch('/api/state').then(r => r.json()).then(render); }, 2000);
+  </script>{/literal}
+
+This two-tag approach is cleaner than scattering {ldelim}/{rdelim} throughout
+JavaScript code, and keeps the Smarty-processed portion minimal and obvious.
+
+
+### Template Variables -- Indoor (This Unit's Sensors)
+
+These variables reflect the local unit's own sensor readings. They are
+always available regardless of outdoor unit configuration. The same values
+are served via /indoorjson with INDOOR_* prefixed keys.
+
+  Variable                 Example        Description
+  -----------------------  -------------  ---------------------------------
+  CURRENT_TEMP             72             Indoor temp, rounded integer
+  TARGET_TEMP              71             Heating setpoint integer
+  CURRENT_TEMP_RAW         72.3           Indoor temp with one decimal
+  TEMP_COLOR               #00FF00        CSS hex color for temp display
+                                          (see Temperature Display Colors)
+  HEAT_ENABLED             1              "1" if heating mode on, "0" off
+  HEAT_ACTIVE              1              "1" if furnace calling, "0" idle
+  HEAT_ENABLED_TEXT        On             "On" or "Off"
+  HEAT_ACTIVE_TEXT         On             "On" or "Off"
+
+  BME_PRESENT              bme680         "bme280", "bme680", or "" if none
+  HUMIDITY                 45.2           Relative humidity % (or "")
+  PRESSURE_HPA             1013.25        Barometric pressure hPa (or "")
+  PRESSURE_INHG            29.92          Barometric pressure inHg (or "")
+  GAS_KOHMS                145.2          Gas resistance kOhms (BME680 only)
+
+  BOARD                    Adafruit ...   Board identifier string
+  UPTIME                   3600           Seconds since boot
+  UPTIME_TEXT              1h 0m          Human-readable uptime
+  FREE_RAM                 42816          Free SRAM in bytes
+  WEBSERVER_PORT           80             HTTP server port
+  SD_CARD                  1              "1" if SD card detected and usable
+                                          "0" if missing, unformatted, or
+                                          unsupported filesystem (see modes)
+  SD_FORMAT                FAT32          Filesystem type of SD card (e.g.
+                                          "FAT32", "FAT16", "exFAT"). Empty
+                                          string "" if no card present.
+  DISPLAY_PRESENT          1              "1" if TFT detected, "0" headless
+  OTA_SUPPORTED            1              "1" on SAMD boards, "0" otherwise
+
+  BATVOLTS          3.82           LiPoly battery voltage from A7
+                                          (WiFi variant only -- Feather M0
+                                          WiFi). Empty string "" on
+                                          Ethernet variants (W5500) where
+                                          no battery monitoring exists.
+
+  WIFI_SECURITY          WPA2           Encryption type of the connected
+                                          network: WPA2, WPA, WEP, Open,
+                                          or Auto (WINC1500 only)
+  WIFI_RSSI                -42            Signal strength in dBm
+                                          (WINC1500 only, "" on Ethernet)
+
+  SHOW_INSIDE_LABEL        1              Always "1"
+  SHOW_CURRENT_TEMP        1              Always "1"
+  SHOW_DEGREE_SYMBOL       1              Always "1"
+  SHOW_HEAT_ON             0              "1" when heat enabled AND active
+  SHOW_HEAT_SETTING        1              "1" when heat mode enabled
+  SHOW_TARGET_TEMP         1              "1" when heat mode enabled
+  SHOW_LIGHT_BUTTON        1              Always "1"
+  SHOW_SYSTEM_BUTTON       1              Always "1"
+  SHOW_HEAT_LABEL          1              "1" when heat mode enabled
+  SHOW_MINUS               1              Always "1"
+  SHOW_PLUS                1              Always "1"
+  SHOW_BME_CARD            1              "1" if any BME sensor detected
+
+The INDOOR_* prefix is used by /indoorjson (see JSON Sensor Endpoints);
+in templates, use the bare name (e.g., {$CURRENT_TEMP} not
+{$INDOOR_CURRENT_TEMP}).
+
+
+### Template Variables -- Outdoor (Remote Sensor Data)
+
+These variables are populated from the outdoor unit's /outdoorjson response
+when polling is configured and the remote unit is online. Values are empty
+strings when the outdoor unit is not available.
+
+  Variable                 Example        Description
+  -----------------------  -------------  ---------------------------------
+  OUTDOOR_TEMP             23.5           Outdoor temperature in °F
+  OUTDOOR_HUMIDITY         78.1           Outdoor relative humidity %
+  OUTDOOR_PRESSURE_HPA     1010.9         Outdoor barometric pressure hPa
+  OUTDOOR_PRESSURE_INHG    29.85          Outdoor barometric pressure inHg
+  OUTDOOR_GAS_KOHMS        145.2          Outdoor gas resistance (BME680)
+  OUTDOOR_BME_TYPE         bme280         Remote sensor type or ""
+  OUTDOOR_BOARD            Adafruit ...   Remote board identifier
+  OUTDOOR_ETH_IP           10.1.0.72      Remote unit Ethernet IP (or "")
+  OUTDOOR_WIFI_IP          192.168.1.50   Remote unit WiFi IP (or "")
+  OUTDOOR_IFACE            ethernet       Remote interface: dual/ethernet/wifi/none
+  OUTDOOR_HAS_ETHERNET     1              "1" if remote has Ethernet
+  OUTDOOR_HAS_WIFI         0              "1" if remote has WiFi
+  OUTDOOR_BATVOLTS  3.82           Remote unit battery voltage
+                                          (empty "" if remote is Ethernet
+                                          variant or not reporting battery)
+
+These variables reflect outdoor unit connection status:
+
+  OUTDOOR_CONFIGURED       1              "1" if device.cfg has valid IP
+  OUTDOOR_STATUS           Online         Status string (see failure chart)
+  OUTDOOR_AVAILABLE        1              "1" only when configured AND Online
+  OUTDOOR_CFG_IP           10.1.0.72      Configured IP (or "")
+  OUTDOOR_CFG_PORT         80             Configured port
+  OUTDOOR_POLL_SECS        30             Configured poll interval
+
+
+### Temperature Display Colors
+
+The indoor temperature display uses four color ranges on both the TFT and
+in the CSS TEMP_COLOR variable:
+
+  Range               TFT Color        CSS Hex    Description
+  ------------------  ---------------  ---------  ---------------------
+  Above 99°F          ILI9341_RED      #FF0000    Overtemp warning
+  0°F to 99°F         ILI9341_GREEN    #00FF00    Normal operating range
+  -1°F to -99°F       ILI9341_CYAN     #00FFFF    Below zero
+  -100°F and below    ILI9341_PURPLE   #800080    Extreme cold
+
+Values above 99 or below -99 overflow the two-digit 7-segment display.
+In those cases the display shows the last two digits of the value (e.g.,
+105°F displays as "05", -105°F displays as "05") and the color indicates
+the actual range.
+
+
+### Digit Formatting
+
+The 7-segment display and CURRENT_TEMP template variable format digits
+as follows. The display always occupies two character positions.
+
+  Range               Format          Example     Note
+  ------------------  --------------  ----------  --------------------
+  100°F and above     Zero-padded     105 -> "05"  Last 2 digits, red
+  10°F to 99°F        No leading zero  72 -> "72"  Normal
+  0°F to 9°F          Space-padded     5 -> " 5"   No leading zero
+  -1°F to -9°F        Space-padded    -3 -> " 3"   Abs value, cyan
+  -10°F to -99°F      No padding     -42 -> "42"   Abs value, cyan
+  -100°F and below    Zero-padded   -105 -> "05"   Last 2 digits, purple
+
+
+### Template Variable Notes
+
+  - Variables are case-sensitive: {$CURRENT_TEMP} not {$current_temp}
+  - Unknown {$TYPO} variables are left as-is in the output
+  - File must be named "index.html" in the SD card root directory
+  - Lines longer than 256 characters are split by the line reader
+  - The /indoorjson and /outdoorjson endpoints serve the same sensor
+    data but with INDOOR_* or OUTDOOR_* key prefixes and additionally
+    include TEMP_COLOR, UPTIME, and IP fields
+
+
+### Template Example
+
+The following is a minimal example. For a full working example including
+a live canvas, environment cards, and interactive controls, see the
+default index.html generated by the firmware onto the SD card at boot
+(via the generateIndexHtml() function in the source).
+
+  <!DOCTYPE html>
+  <html><head><title>Thermostat</title></head>
+  <body>
+    <!-- {* Smarty template -- processed server-side by firmware *} -->
+    <h1>Inside: {$CURRENT_TEMP}°F</h1>
+
+    {if $HEAT_ACTIVE}
+      <p style="color:red">Heat is ON -- target {$TARGET_TEMP}°F</p>
+    {elseif $HEAT_ENABLED}
+      <p>Heat standby -- target {$TARGET_TEMP}°F</p>
+    {else}
+      <p>Heating disabled</p>
+    {/if}
+
+    {if $OUTDOOR_AVAILABLE}
+      <p>Outside: {$OUTDOOR_TEMP}°F, {$OUTDOOR_HUMIDITY}% humidity</p>
+    {elseif $OUTDOOR_CONFIGURED}
+      <p>Outdoor unit: {$OUTDOOR_STATUS}</p>
+    {/if}
+
+    {if $SHOW_BME_CARD}
+      <div>Humidity: {$HUMIDITY}% | Pressure: {$PRESSURE_INHG} inHg</div>
+    {/if}
+
+    <!-- Smarty variable declarations (processed by template engine) -->
+    <script>
+      var currentTemp = {$CURRENT_TEMP};
+      var targetTemp = {$TARGET_TEMP};
+      var outdoorAvail = {$OUTDOOR_AVAILABLE};
+    </script>
+    <!-- Pure JavaScript (no template processing needed) -->
+    {literal}<script>
+      function render() {
+        if (outdoorAvail) {
+          document.getElementById('outdoor').style.display = 'block';
+        }
+      }
+      setInterval(() => {
+        fetch('/api/state').then(r => r.json()).then(render);
+      }, 2000);
+    </script>{/literal}
+  </body></html>
+
+
+### SD Card Template Examples
+
+The project includes example SD card templates that mirror the
+firmware's built-in /config and /update pages using Smarty template
+syntax. These are standalone files -- the firmware's /config and
+/update routes always serve their built-in pages, not SD templates.
+These templates are served by the SD card catchall route: any URL
+that does not match an explicit route is looked up as a file on the
+SD card root. HTML files are processed through the template engine,
+so template variables and {foreach} loops work in any filename.
+
+  File               Variant      Purpose
+  -----------------  -----------  ----------------------------------
+  config-wifi.html   WINC1500     Config page with WiFi scan, forms
+  config-eth.html    W5500        Config page with Ethernet status
+  config-dual.html   DUAL_NETWORK Config page with tabbed Eth/WiFi
+  update-wifi.html   WINC1500     OTA update page with WiFi status
+  update-eth.html    W5500        OTA update page with link status
+  update-dual.html   DUAL_NETWORK OTA update page (use Ethernet!)
+
+The config templates mirror all cards from the built-in /config page:
+network status (read-only), network settings (editable form), outdoor
+unit status, outdoor configuration form, clear button, and endpoint
+links. The WiFi variant includes a Scan button calling /api/scan and
+server-side scan results via {foreach $WIFI_NETWORKS as $net}. The
+Dual Network variant uses a tabbed interface to show both Ethernet
+and WiFi panels. All config forms submit via fetch() POST to
+/api/config (JavaScript in {literal} blocks) with GET query-string
+fallback for noscript.
+
+The update templates mirror the built-in /update page: file selector,
+progress bar, and XHR upload to POST /api/update. Each variant adds a
+small status bar showing the relevant network info (WiFi SSID/RSSI or
+Ethernet IP/link state).
+
+**Note:** For Dual Network boards, firmware updates should be performed
+via the Ethernet interface whenever possible. WiFi connections may drop
+during the upload, corrupting the update. The update-dual.html template
+displays a warning when accessed via WiFi.
+
+Common template variables: {$BOARD}, {$UPTIME_TEXT}, {$SD_CARD},
+{$OTA_SUPPORTED}, {$OUTDOOR_CONFIGURED}, {$OUTDOOR_CFG_IP},
+{$OUTDOOR_CFG_PORT}, {$OUTDOOR_POLL_SECS}, {$OUTDOOR_STATUS},
+{$OUTDOOR_AVAILABLE}, {$OUTDOOR_TEMP}, {$OUTDOOR_HUMIDITY}.
+
+Ethernet templates use: {$ETH_IP}, {$ETH_MAC}, {$ETH_SUBNET},
+{$ETH_GATEWAY}, {$ETH_LINK}, {$ETH_CFG_IP}, etc.
+
+WiFi templates use: {$WIFI_IP}, {$WIFI_MAC}, {$WIFI_SSID},
+{$WIFI_RSSI}, {$WIFI_SECURITY}, {$WIFI_CFG_IP}, etc.,
+{$BATVOLTS} (M0 WiFi only).
+
+All templates can use: {$HAS_ETHERNET}, {$HAS_WIFI}, {$IS_DUAL_NETWORK},
+{$NETWORK_MODE}, {$CLIENT_INTERFACE}, {$CLIENT_IS_ETH}, {$CLIENT_IS_WIFI}.
+
+To use: copy the appropriate variant to the SD card root and link
+to it from a customized index.html (e.g. <a href="/config-wifi.html">
+or <a href="/update-wifi.html">). The SD catchall route serves these
+files directly by filename. The firmware's built-in /config and
+/update routes always serve the embedded pages regardless of what
+is on the SD card -- the SD templates are reached via their full
+filename (e.g. /config-wifi.html), not via /config.
+
+
+## SD Card Configuration (device.cfg)
+
+### Configuration Keys
+
+Network keys are available based on compiled interfaces. Use
+ETH_* for Ethernet builds and WIFI_* for WiFi builds.
+
+Ethernet settings (W5500 or DUAL_NETWORK builds):
+
+  Key                Type       Default         Description
+  -----------------  ---------  --------------  ---------------------------
+  ETH_IP             IP/DHCP    (DHCP)          Ethernet static IP
+  ETH_DNS            IP addr    (none)          Ethernet DNS server
+  ETH_SUBNET         IP addr    255.255.255.0   Ethernet subnet mask
+  ETH_GATEWAY        IP addr    (none)          Ethernet gateway
+  ETH_MAC            MAC addr   (EEPROM)        Override W5500 MAC
+
+WiFi settings (WINC1500, ESP32, or DUAL_NETWORK builds):
+
+  Key                Type       Default         Description
+  -----------------  ---------  --------------  ---------------------------
+  WIFI_SSID          string     (none)          WiFi network name
+  WIFI_PASS          string     (none)          WiFi password
+  WIFI_SECURITY      string     (auto)          WiFi security type
+  WIFI_IP            IP/DHCP    (DHCP)          WiFi static IP
+  WIFI_DNS           IP addr    (none)          WiFi DNS server
+  WIFI_SUBNET        IP addr    255.255.255.0   WiFi subnet mask
+  WIFI_GATEWAY       IP addr    (none)          WiFi gateway
+
+Common settings (all builds):
+
+  Key                Type       Default         Description
+  -----------------  ---------  --------------  ---------------------------
+  OUTDOOR_IP         IP addr    (none)          Remote unit IP address
+  OUTDOOR_PORT       uint16     80              Remote unit HTTP port
+  OUTDOOR_POLL       uint16     30              Poll interval (seconds)
+  RELAY_PIN          int/OFF    13              Relay output GPIO pin
+
+### Example device.cfg
+
+Ethernet (single-interface):
+  # Network
+  ETH_IP=10.1.0.71
+  ETH_DNS=10.1.0.1
+  ETH_GATEWAY=10.1.0.1
+  
+  # Outdoor unit
+  OUTDOOR_IP=10.1.0.72
+  OUTDOOR_PORT=80
+  OUTDOOR_POLL=30
+  
+  # Relay
+  RELAY_PIN=13
+
+WiFi (single-interface - M0 or ESP32):
+  # WiFi credentials
+  WIFI_SSID=MyNetwork
+  WIFI_PASS=secretpassword
+  
+  # Static IP (optional, DHCP if omitted)
+  WIFI_IP=192.168.1.50
+  WIFI_DNS=192.168.1.1
+  WIFI_GATEWAY=192.168.1.1
+
+Dual Network (ESP32 + PoE):
+  # Ethernet settings
+  ETH_IP=10.1.0.71
+  ETH_DNS=10.1.0.1
+  ETH_GATEWAY=10.1.0.1
+  
+  # WiFi settings
+  WIFI_SSID=HomeNetwork
+  WIFI_PASS=wifipassword
+  WIFI_IP=192.168.1.50
+  WIFI_DNS=192.168.1.1
+  WIFI_GATEWAY=192.168.1.1
+  
+  # Outdoor unit (accessible from either network)
+  OUTDOOR_IP=10.1.0.72
+
+### Configuration Notes
+
+File location: /device.cfg on SD card root.
+Format: key=value, one per line. Lines starting with # are comments.
+Missing file or blank OUTDOOR_IP = outdoor polling disabled.
+
+RELAY_PIN: Controls which GPIO pin drives the heat relay. Set to a
+GPIO number (e.g., RELAY_PIN=14 for pin A0 on Feather M4) to enable
+hardware relay switching. The pin drives HIGH when heat is on, LOW
+when off. Set to -1, OFF, DISABLED, or NONE to disable relay output
+(software-only heat tracking). The compile-time RELAY_PIN define
+serves as the default if device.cfg does not specify a value.
+
+Network Settings: The ETH_IP and WIFI_IP keys accept
+either a dotted-quad IP address (e.g. 10.1.0.71) or the string "DHCP"
+(not case sensitive). When the key is "DHCP" or absent, the firmware
+uses DHCP. When a valid IP address is provided, static configuration
+is used:
+
+  - W5500 Ethernet: Uses ETH_IP directly (skipping DHCP).
+    If ETH_IP is absent or DHCP, DHCP is attempted first; if
+    DHCP fails, the compiled-in fallback IP is used.
+  - WINC1500 WiFi: WiFi.config() is called after WiFi.begin() connects
+    to the access point. Uses WIFI_IP if present.
+  - ESP32 WiFi: Same as WINC1500, but uses the ESP32 WiFi library.
+  - DUAL_NETWORK: Each interface is configured independently using
+    ETH_* and WIFI_* keys.
+
+WIFI_SSID and WIFI_PASS override the compile-time SECRET_SSID and
+SECRET_PASS from arduino_secrets.h. See WiFi Configuration for the
+full priority chain.
+
+WIFI_SECURITY specifies the security type when connecting to a WiFi
+network. Values are not case sensitive. The mapping to WiFi101
+library constants is:
+
+  device.cfg Value    WiFi101 Constant    Description
+  ------------------  ------------------  ----------------------------
+  WPA2                ENC_TYPE_CCMP       WPA2 Personal (AES-CCMP)
+  WPA                 ENC_TYPE_TKIP       WPA Personal (TKIP)
+  WEP                 ENC_TYPE_WEP        WEP (legacy, not recommended)
+  Open                ENC_TYPE_NONE       No encryption (open network)
+
+When WIFI_SECURITY is absent, the WINC1500 auto-detects the encryption
+type during association -- this works for most networks and is the
+recommended default. Specifying WIFI_SECURITY explicitly is only needed
+when the auto-detection fails or when connecting to a hidden network.
+
+The WiFi101 constant names shown above are the raw values returned by
+WiFi.encryptionType() and mapped in the /api/scan endpoint. The
+device.cfg values (WPA2, WPA, WEP, Open) are the same strings
+displayed on the /config page and in the TFT overlay.
+
+Boot Order: The SD card is initialized before networking in setup(),
+so device.cfg values are available before Ethernet.begin() or
+WiFi.begin() is called. This ensures network overrides from the
+config file take effect on the first connection attempt.
+
+MAC Address Format: The ETH_MAC value is six colon-separated
+hexadecimal byte pairs (e.g. ETH_MAC=0E:AD:BE:EF:FE:E0). The
+hexadecimal digits are not case sensitive -- 0e:ad:be:ef:fe:e0,
+0E:AD:BE:EF:FE:E0, and mixed-case variants are all equivalent.
+Uppercase is preferred for readability and consistency with IEEE
+conventions. The firmware converts any lowercase hex digits to
+uppercase when loading device.cfg, so the value stored in memory
+and displayed in the settings overlay / API response will always
+be uppercase regardless of how it was entered in the file.
+
+Line Endings: device.cfg supports all common line ending formats:
+
+  Windows (CRLF):    \r\n
+  Unix/Linux (LF):   \n
+  Classic Mac (CR):  \r
+
+The recommended format is Windows (CRLF), since most users will edit
+the file on a Windows PC and Notepad (the default text editor) uses
+CRLF by default. However, any format works: any mixture of line
+endings within the same file is handled correctly by the firmware's
+line parser, which treats \r, \n, and \r\n interchangeably as line
+terminators.
+
+First-Boot Prepopulation: If a device.cfg file already exists on the SD
+card when the unit boots, its settings are loaded immediately. This means
+you can prepare a fully configured SD card before deploying the unit by
+creating device.cfg with the documented key=value format in any text
+editor:
+
+  # device.cfg -- prepared for field deployment (Ethernet)
+  # Network settings
+  ETH_IP=10.1.0.71
+  ETH_DNS=10.1.0.1
+  ETH_SUBNET=255.255.255.0
+  ETH_GATEWAY=10.1.0.1
+  ETH_MAC=0E:AD:BE:EF:FE:E0
+  # Outdoor unit
+  OUTDOOR_IP=10.1.0.72
+  OUTDOOR_PORT=80
+  OUTDOOR_POLL=30
+
+For a WiFi unit with static IP:
+
+  # device.cfg -- WiFi with static IP
+  WIFI_SSID=SiteNetwork
+  WIFI_PASS=mypassword123
+  WIFI_SECURITY=WPA2
+  WIFI_IP=192.168.1.50
+  WIFI_DNS=192.168.1.1
+  WIFI_GATEWAY=192.168.1.1
+
+For a WiFi unit using DHCP (no static IP):
+
+  # device.cfg -- WiFi with DHCP
+  WIFI_SSID=SiteNetwork
+  WIFI_PASS=mypassword123
+
+Insert this SD card into the thermostat and power on -- the unit will
+use the configured static IP (or connect to the specified WiFi network)
+and begin polling the outdoor unit immediately, with no manual
+configuration needed via the web interface.
+
+MAC Address Override: If the ETH_MAC key is present (format:
+ETH_MAC=0E:AD:BE:EF:FE:E0), it overrides both the PoE-FeatherWing
+EEPROM and the hardcoded fallback. Hexadecimal digits are not case
+sensitive (uppercase preferred; auto-converted on load). This is
+useful when replacing a board on an existing network (preserving DHCP
+reservations and firewall rules) or when the 24AA02E48 EEPROM is
+absent or unreadable.
+
+
+### /config Web Page
+
+The /config page provides forms to manage both network settings and
+outdoor unit configuration. Changes are saved to device.cfg on the
+SD card.
+
+Page layout uses a consistent tabbed interface across all network modes.
+The tab bar maintains consistent positioning: Ethernet tab on the left,
+WiFi tab on the right. Single-interface builds show one tab with empty
+space where the other tab would be.
+
+### Single-Interface Mode (Ethernet or WiFi)
+
+  1. Network Configuration card with tab bar:
+     - Ethernet-only: Ethernet tab on left, empty space on right.
+     - WiFi-only: Empty space on left, WiFi tab on right.
+     - Status section: Board, IP, MAC, link status, SD card presence
+       and filesystem type (e.g. FAT32, exFAT) if present.
+       WiFi additionally shows SSID and RSSI.
+     - Settings section: Static IP fields (blank = DHCP). WiFi also
+       has SSID field with Scan button and password field.
+     - Tab/card border: yellow (Ethernet) or blue (WiFi).
+
+  2. Outdoor Unit Status card (read-only) -- Outdoor IP, port, poll
+     interval, status with color coding, temp/humidity when online.
+
+  3. Configure Outdoor Unit card (editable form) -- Outdoor IP, port,
+     and poll interval fields.
+
+  4. Clear Outdoor Config button -- Clears outdoor settings while
+     preserving network credentials.
+
+  5. Endpoints card -- Quick links to /, /outdoorjson, /indoorjson,
+     /api/state, /config, and (WiFi) /api/scan.
+
+### Dual Network Mode (ESP32 + PoE FeatherWing)
+
+  1. Network Configuration card with tab bar:
+     - Ethernet tab: IP, MAC, link status, PoE indicator, static IP
+       settings for the Ethernet interface.
+     - WiFi tab: SSID, IP, MAC, RSSI, WiFi credentials with Scan
+       button, static IP settings for the WiFi interface.
+     - Info box: Shows which interface changes apply immediately vs
+       requiring restart or access from the other interface.
+     - Single Save button saves both tabs.
+     - Board and SD card info (with filesystem type) below the form.
+
+  2-5. Same as single-interface mode.
+
+The tabbed interface uses display:none to toggle visibility. All form
+fields are always in the DOM, simplifying JavaScript (no hidden field
+synchronization needed).
+
+### Change Application Logic
+
+  - Single-interface: All changes take effect after reboot.
+  - Dual Network:
+    - Save from Ethernet → WiFi changes apply immediately
+    - Save from WiFi → Ethernet changes apply immediately
+    - Changes to your current interface apply after restart or when
+      accessed from the other interface
+
+Outdoor config changes always take effect immediately.
+
+### Form Parameters
+
+Config page accepts GET query strings (noscript fallback):
+
+  GET /config?section=network&eth_cfg_ip=X...    Network settings
+  GET /config?ip=X&port=Y&poll=Z                    Outdoor settings
+  GET /config?clear=1                               Clear outdoor
+
+When JavaScript is available, forms POST JSON to /api/config instead.
+
+### POST /api/config (JSON Configuration API)
+
+  POST /api/config
+  Content-Type: application/json
+
+Accepts a JSON body with an "action" field that determines the
+operation. Returns {"success":true} or {"success":false,"error":"..."}.
+CORS headers are included; OPTIONS preflight is handled.
+
+Single-interface network settings:
+
+  {"action":"network",
+   "eth_cfg_ip":"10.1.0.71",       // Ethernet mode
+   "eth_cfg_dns":"10.1.0.1",
+   "eth_cfg_subnet":"255.255.255.0",
+   "eth_cfg_gateway":"10.1.0.1"}
+
+  {"action":"network",
+   "wifi_ssid":"MyNetwork",           // WiFi mode
+   "wifi_pass":"secret",
+   "wifi_cfg_ip":"192.168.1.50",
+   "wifi_cfg_dns":"192.168.1.1",
+   "wifi_cfg_subnet":"255.255.255.0",
+   "wifi_cfg_gateway":"192.168.1.1"}
+
+Dual network settings:
+
+  {"action":"dual_network",
+   "eth_cfg_ip":"10.1.0.71",
+   "eth_cfg_dns":"10.1.0.1",
+   "eth_cfg_subnet":"255.255.255.0",
+   "eth_cfg_gateway":"10.1.0.1",
+   "wifi_ssid":"MyNetwork",
+   "wifi_pass":"secret",
+   "wifi_cfg_ip":"192.168.1.50",
+   "wifi_cfg_dns":"192.168.1.1",
+   "wifi_cfg_subnet":"255.255.255.0",
+   "wifi_cfg_gateway":"192.168.1.1"}
+
+All fields are optional. Omitted fields are not changed. An empty IP
+field (e.g., "eth_cfg_ip":"") sets DHCP mode for that interface.
+
+Outdoor unit settings:
+
+  {"action":"outdoor",
+   "ip":"10.1.0.72",
+   "port":80,
+   "poll":30}
+
+Clear outdoor configuration:
+
+  {"action":"clear_outdoor"}
+
+This follows the same pattern as the /update page (GET serves the
+form) and /api/update (POST accepts the data). The GET /config form
+remains available for browsers with JavaScript disabled.
+
+
+## Architecture
+
+Any unit can serve as indoor (master) or outdoor (remote), or both. Every
+unit serves /outdoorjson and /indoorjson regardless of hardware. An indoor
+unit polls a configured outdoor unit's /outdoorjson endpoint on a timer to
+retrieve remote sensor data.
+
+
+### Outdoor Unit Polling -- Failure Status Chart
+
+After 5 consecutive failures of the same type, outdoorStatus is updated to
+the corresponding status string. A single successful poll resets the counter
+and restores "Online".
+
+  Failure Condition                          Status String   Color
+  -----------------------------------------  --------------  -----
+  Can't connect (TCP refused/unreachable)    Offline         Red
+  Connected but no response within 3s        Timeout         Red
+  HTTP 404 response                          404             Red
+  HTTP error other than 404 (e.g. 500)       (that number)   Red
+  200 response but no \r\n\r\n separator     Blank Data      Red
+  200 response, body found, OUTDOOR_TEMP     Bad JSON        Red
+    key missing or unparseable
+  No networking compiled in (#else branch)   N/A             Grey
+  Successful poll with valid data            Online          Green
+
+All display surfaces (TFT overlay, canvas cards, /config page) show the
+actual status string with color coding.
+
+
+### Polling Implementation
+
+The pollOutdoor() function runs in loop() on a timer:
+
+  - Guard: outdoorConfigured must be true
+  - Guard: millis() - outdoorLastPoll >= outdoorPollSecs * 1000
+  - Compiles only if W5500 or WINC1500 is defined
+  - Connection timeout: 3s (W5500), response timeout: 5s
+  - Sends: GET /outdoorjson HTTP/1.1 with Host and Connection: close
+  - Parses response body with lightweight string parser (no ArduinoJson)
+  - Extracts: OUTDOOR_TEMP, OUTDOOR_HUMIDITY, OUTDOOR_PRESSURE_HPA,
+    OUTDOOR_PRESSURE_INHG, OUTDOOR_GAS_KOHMS, OUTDOOR_BME_TYPE,
+    OUTDOOR_BOARD, OUTDOOR_IP
+  - Success: outdoorStatus="Online", failCount=0
+  - Failure: failCount++, status set after 5 consecutive failures
+
+
+## DHCP and Network Configuration
+
+The SD card is initialized early in setup(), before networking, so that
+device.cfg can be loaded and its values applied to the network stack.
+
+Both W5500 Ethernet and WINC1500 WiFi support three IP configuration
+modes, applied in this priority order:
+
+  1. Static IP from device.cfg -- If ETH_IP (for Ethernet) or
+     WIFI_IP (for WiFi) is present and contains a valid IP
+     address (not "DHCP" and not 0.0.0.0), the firmware uses it
+     directly. For Ethernet, DHCP is skipped entirely. For WiFi,
+     WiFi.config() is called after the connection is established.
+  2. DHCP -- If no static IP is configured, DHCP is attempted first.
+  3. Compiled fallback -- (Ethernet only) If DHCP fails after ~15
+     seconds, the firmware falls back to the static IP defined in
+     the source code (eth_ip / eth_dns). WiFi has no compiled
+     fallback; if DHCP fails, the connection remains without an IP.
+
+The W5500 MAC address priority chain (highest to lowest):
+
+  1. device.cfg ETH_MAC key -- If present (format:
+     ETH_MAC=0E:AD:BE:EF:FE:E0), the EEPROM read is skipped
+     entirely and this MAC is used for Ethernet.begin(). Hex digits
+     are not case sensitive; the firmware validates the format and
+     logs an error on parse failure. saveDeviceConfig() preserves
+     the override so it round-trips through web config changes.
+  2. 24AA02E48 I2C EEPROM -- Read from the PoE-FeatherWing at address
+     0x50 (registers 0xFA–0xFF).
+  3. Hardcoded fallback -- The compiled-in default if both above fail.
+
+This allows replacing a board without changing the MAC address on the
+network, or working around a damaged/missing EEPROM.
+
+See also: SD Card Configuration (device.cfg) for the full list of
+network keys (ETH_IP, ETH_DNS, WIFI_IP, WIFI_SSID, WIFI_PASS, ETH_MAC).
+
+
+### WiFi Configuration (WINC1500)
+
+The Feather M0 WiFi uses the ATWINC1500 module for wireless
+connectivity. The WINC1500 operates on the 2.4 GHz band only
+(IEEE 802.11 b/g/n) and does not support 5 GHz networks. Ensure
+the target access point broadcasts a 2.4 GHz SSID.
+
+WiFi credentials can be configured at three levels, with
+each level overriding the previous:
+
+  Priority   Source             Notes
+  ---------  -----------------  --------------------------------------
+  1 (low)    arduino_secrets.h  Compile-time defaults (SECRET_SSID,
+                                SECRET_PASS). Ships as SSID "ANY" with
+                                empty password. Requires recompiling to
+                                change.
+  2 (mid)    device.cfg on SD   WIFI_SSID and WIFI_PASS keys. Loaded at
+                                boot. Can be prepopulated before first
+                                deployment (see First-Boot Prepopulation
+                                in SD Card Configuration above).
+  3 (high)   /config web form   The Network Settings card on /config
+                                allows editing WiFi SSID and password.
+                                Includes a Scan button that queries
+                                /api/scan to list nearby networks with
+                                signal strength, encryption type, and
+                                lock icons. Selecting a network populates
+                                the SSID field. Saved values are written
+                                to device.cfg and take effect on reboot.
+
+At boot, the firmware reads the active SSID and password (from
+device.cfg if present, otherwise from arduino_secrets.h) and calls
+WiFi.begin(ssid, pass). The active SSID is printed to Serial during
+connection. Connection blocks with a 30-second timeout (dot-print
+progress on Serial).
+
+The special SSID string "ANY" (case-sensitive) instructs the WINC1500
+to connect to the first or closest unsecured (open) access point
+without requiring a password. This default is provided for initial
+setup convenience only and is not recommended for regular use, as it
+connects to any nearby open network without authentication. Users
+should configure a specific SSID and password via device.cfg or the
+/config web form before deployment.
+
+WiFi Network Scanning:
+
+The firmware provides a /api/scan endpoint (WINC1500/ESP_WIFI only) that
+calls WiFi.scanNetworks(), buffers results based on board RAM (ESP32/RP2040
+=64, M4=48, M0=24 via TPL_MAX_FOREACH_ITEMS), sorts them by RSSI descending
+(strongest first), and returns a JSON object with nearby access points:
+
+  {
+    "maxNetworks": 64,
+    "count": 12,
+    "networks": [
+      {"ssid": "ThermoNet-5G", "rssi": -42, "enc": "WPA2"},
+      {"ssid": "NETGEAR-Guest", "rssi": -71, "enc": "Open"},
+      ...
+    ]
+  }
+
+Encryption types are mapped from WiFi101 constants (WINC1500) or
+wifi_auth_mode_t (ESP32):
+  ENC_TYPE_WEP  -> "WEP"
+  ENC_TYPE_TKIP -> "WPA"
+  ENC_TYPE_CCMP -> "WPA2"
+  ENC_TYPE_NONE -> "Open"
+  (other)       -> "Auto"
+
+Sorting is handled by wifiScanSorted(), which is shared with the
+template engine's {foreach $WIFI_NETWORKS} scan cache.
+
+The /config page uses this endpoint via fetch() to populate a
+scrollable network list with signal bars and lock icons. Lock icons
+display the encryption type as a tooltip on hover.
+
+WiFi-specific status reporting:
+
+When running on a WINC1500 board, additional information is reported
+in three places:
+
+  1. TFT settings overlay (Region 1 -- see Settings Overlay) -- The WiFi
+     variant displays SSID, security type, RSSI, and battery voltage
+     in a two-column layout alongside the standard network fields.
+
+  2. /config page -- The Network Status card shows all WiFi-specific
+     fields (SSID, security, RSSI, battery) as read-only values.
+
+  3. Template variables -- WIFI_SSID, WIFI_SECURITY, WIFI_RSSI, and
+     BATVOLTS are all available as Smarty template variables
+     (see Template Variables -- Indoor).
+
+  4. /api/state -- The network{} object includes "ssid", "security",
+     "rssi", and "battery" fields for WINC1500 boards (see GET /api/state
+     for the full JSON schema).
+
+Battery monitoring (WiFi variant only):
+
+The Feather M0 WiFi includes a LiPoly battery connector and a
+voltage divider on pin A7. The firmware reads A7 to populate the
+BATVOLTS template variable. The OUTDOOR_BATVOLTS
+template variable reflects the remote unit's battery reading when
+the outdoor unit is a WiFi variant. A reading outside the 3.0V–4.3V
+LiPoly range typically indicates no battery is connected (USB power
+only -- the voltage divider reads the charger circuit output).
+
+The WIFI_SECURITY key in device.cfg allows specifying the encryption
+type explicitly (WPA2, WPA, WEP, Open) instead of relying on
+auto-detection. See the SD Card Configuration section for valid
+values and their WiFi101 constant mappings.
+
+
+## REST API
+
+All API endpoints return JSON with CORS headers (Access-Control-Allow-Origin: *).
+
+
+### GET /api/state
+
+Returns complete thermostat state for live polling. This is the primary
+endpoint consumed by the fallback page's JavaScript and any external
+integrations.
+
+  {
+    "currentTemp": 72,
+    "targetTemp": 71,
+    "heatEnabled": true,
+    "heatActive": false,
+    "showSettings": false,
+    "lastChange": 45230,
+    "uptime": 360000,
+    "tempColor": "#00FF00",
+    "environment": {
+      "humidity": 45.2,
+      "pressInhg": 29.92,
+      "gasKohms": 145.2,
+      "sensor": "BME680"
+    },
+    "outdoor": {
+      "configured": true,
+      "status": "Online",
+      "ip": "10.1.0.72",
+      "port": 80,
+      "pollSecs": 30,
+      "temp": "23",
+      "humidity": "78.1",
+      "pressInhg": "29.85",
+      "gasKohms": "145.2",
+      "bmeType": "bme680",
+      "board": "Adafruit Feather M4 (PoE Ethernet)",
+      "unitIP": "10.1.0.72"
+    },
+    "network": {
+      "ip": "10.1.0.71",
+      "subnet": "255.255.255.0",
+      "gateway": "10.1.0.1",
+      "mac": "0E:AD:BE:EF:FE:E0",
+      "link": "Connected"
+    }
+  }
+
+Notes:
+  - environment{} is empty if no BME sensor is detected
+  - environment.gasKohms is present only with BME680 (not BME280)
+  - outdoor.temp/humidity/etc. fields are present only when status="Online"
+  - outdoor.ip/port/pollSecs are present only when configured=true
+  - uptime and lastChange are in milliseconds (from millis())
+  - tempColor is a CSS hex string indicating the indoor temperature range:
+      #00FF00 green  = normal (0°F to 99°F)
+      #FF0000 red    = hot (above 99°F)
+      #00FFFF cyan   = cold (0°F to -99°F)
+      #800080 purple = extreme cold (-100°F and below)
+  - When using WINC1500, network{} additionally includes:
+      "ssid" (connected access point name),
+      "security" (WPA2/WPA/WEP/Open/Auto),
+      "rssi" (signal strength in dBm, integer),
+      "battery" (voltage string from A7 divider, e.g. "3.82").
+    These match the WIFI_SSID, WIFI_SECURITY, WIFI_RSSI, and
+    BATVOLTS template variables. W5500 builds omit these fields.
+
+
+### GET /api/set
+
+Control endpoint accepting query parameters. Multiple parameters can be
+combined in a single request.
+
+  Parameter    Values              Description
+  -----------  ------------------  --------------------------------------
+  target       Integer (e.g. 72)   Set target temperature
+  heat         on | off            Enable or disable heat mode
+  settings     toggle | on | off   Control settings overlay visibility
+
+Returns: {"success": true} or {"success": false}
+
+Examples:
+  /api/set?target=72
+  /api/set?heat=off
+  /api/set?target=70&heat=on
+  /api/set?settings=toggle
+
+
+## JSON Sensor Endpoints
+
+These endpoints serve this unit's own sensor data. Both are always
+available regardless of outdoor unit configuration.
+
+  Endpoint        Content-Type      Key Prefix   Description
+  --------------  ----------------  -----------  --------------------------
+  /outdoorjson    application/json  OUTDOOR_*    For a remote indoor unit
+                                                 to consume as exterior data
+  /indoorjson     application/json  INDOOR_*     Diagnostics / integration
+
+Both return the same sensor values with different key prefixes. Fields
+include: TEMP, TEMP_COLOR, HUMIDITY, PRESSURE_HPA, PRESSURE_INHG,
+GAS_KOHMS, BME_TYPE, BOARD, IP, UPTIME.
+
+
+## Complete Endpoint Summary
+
+  Endpoint           Method   Content-Type      Description
+  -----------------  -------  ----------------  -------------------------------
+  /                  GET      text/html         Main thermostat UI
+  /outdoorjson       GET      application/json  This unit's sensors (OUTDOOR_*)
+  /indoorjson        GET      application/json  This unit's sensors (INDOOR_*)
+  /api/state         GET      application/json  Full state + environment + outdoor
+  /api/poll          GET      application/json  Lightweight polling (see below)
+  /api/network       GET      application/json  Network info on demand (see below)
+  /api/set           GET      application/json  Control commands (query params)
+  /api/scan          GET      application/json  WiFi scan sorted by RSSI
+  /config            GET      text/html         Network + outdoor config page
+  /api/config        POST     application/json  Network/outdoor config (JSON)
+  /update            GET      text/html         OTA / SD firmware update page
+  /api/update        POST     application/octet Binary firmware upload (OTA)
+  /api/sdupload      POST     application/octet Upload UPDATE.bin to SD card
+  /api/reboot        GET      application/json  Trigger software reboot
+  /sdfiles           GET      text/html         SD card file manager UI
+  /api/sdlist        GET      application/json  List SD card directory
+  /api/sdread        GET      application/json  Read file for editor (max 32KB)
+  /api/sddownload    GET      application/octet Download file as attachment
+  /api/sddelete      POST     application/json  Delete file or directory
+  /api/sdwrite       POST     application/json  Save file from editor
+  /api/sdformat      POST     application/json  Format SD card
+  /api/sdfileupload  POST     multipart/form    Upload file to SD card (max 64KB)
+  /favicon.ico       GET      image/x-icon      Favicon (SD card or PROGMEM)
+  /*                 GET      (auto-detected)   SD card catchall (see below)
+
+The catchall route serves any file from the SD card root when no
+explicit route matches. Subdirectories are fully supported — a request
+for /css/style.css serves the file css/style.css from the SD card.
+
+Auto-indexing: If the requested path is a directory (e.g., /app/ or
+/app), the server automatically tries to serve index.html from inside
+that directory (app/index.html). This mimics standard web server
+behavior and allows organizing content into folders.
+
+HTML files (.html, .htm) are processed through the Smarty template
+engine (variables, {foreach}, {if}, {literal}); all other files are
+streamed as raw bytes. Content-Type is inferred from the file extension
+(html, css, js, json, txt, png, jpg, gif, svg, ico, xml, bin; defaults
+to application/octet-stream). Requests with ".." in the path are
+rejected to prevent directory traversal attacks.
+
+If the file is not found on the SD card (or no card is present), the
+firmware looks for a 404.html on the SD card and serves it as the
+error page (template-processed, so Smarty variables work). If no
+404.html exists either, the firmware's built-in error page is shown.
+
+This is how the SD card config and update templates (config-wifi.html,
+config-eth.html, update-wifi.html, update-eth.html) are served. Place
+them on the SD card and link from a customized index.html.
+
+See also: SD Card Favicon (under Fallback Page).
+
+
+## Known Limitations
+
+### FTP Server Not Supported
+
+FTP file transfer is NOT supported on ESP32-S2/S3 eyeSPI hardware due to
+an unresolvable SPI bus conflict between SimpleFTPServer and the ILI9341
+TFT display driver.
+
+Confirmed behavior:
+  - Display + SD card (no FTP): ALWAYS works correctly
+  - Display + SD card + FTP: Display flashes/fails continuously
+
+Approaches attempted and failed:
+  1. SimpleFTPServer with STORAGE_SDFAT2, NETWORK_ESP32
+  2. SimpleFTPServer with NETWORK_W5100 (Ethernet-only build)
+  3. Chip Select management (all CS pins HIGH before init)
+  4. SHARED_SPI mode for SdFat library
+  5. Moving SD card to HSPI (SPI3) second bus
+  6. Delayed FTP initialization (pointer + new in setup())
+  7. Local fork with SdFs extern type fix
+  8. Alternative libraries (ESP32_FTPServer_SD_MMC, esp8266FTPServer)
+
+Root cause: SimpleFTPServer's EthernetServer construction and SPI handling
+interferes with the ILI9341 display driver on the shared SPI bus. No known
+fix exists without a deep rewrite of SimpleFTPServer's network layer.
+
+Workaround: Use the web-based SD card file manager at /sdfiles instead.
+This provides browse, upload, download, edit, and delete functionality.
+
+
+## Lightweight Polling API
+
+### GET /api/poll
+
+Returns minimal JSON for frequent polling (smaller payload than /api/state).
+
+Response:
+  {
+    "t": 72,       // Current indoor temp (rounded integer)
+    "g": 70,       // Target temp
+    "h": 1,        // Heat enabled (1/0)
+    "a": 1,        // Heat actually on (relay active, 1/0)
+    "s": "off",    // Settings screen state ("off", "lan", "wifi")
+    "c": 123456    // Last state change timestamp (millis)
+  }
+
+Use case: Web interface polls this endpoint frequently (1-2 seconds) to
+keep the display updated. The compact format minimizes bandwidth.
+
+
+### GET /api/network
+
+Returns detailed network configuration (fetched on demand, not polled).
+
+Ethernet mode:
+  {"mode":"ethernet","ip":"10.1.0.71","subnet":"255.255.255.0",
+   "gateway":"10.1.0.1","mac":"DE:AD:BE:EF:FE:ED","link":"Connected"}
+
+WiFi mode:
+  {"mode":"wifi","ip":"192.168.1.50","subnet":"255.255.255.0",
+   "gateway":"192.168.1.1","mac":"AA:BB:CC:DD:EE:FF",
+   "link":"Connected","ssid":"MyNetwork","security":"WPA2","rssi":-45}
+
+Dual network mode:
+  {"mode":"dual",
+   "ethernet":{"ip":"10.1.0.71",...,"link":"Connected"},
+   "wifi":{"ip":"192.168.1.50",...,"rssi":-45}}
+
+Battery voltage is included on boards with HAS_BATT defined.
+
+
+## SD Card Management API
+
+These endpoints provide browser-based file management for the SD card.
+All paths must be safe (no ".." traversal). Leading slashes are optional.
+
+### GET /api/sdlist?path=/
+
+Lists directory contents.
+
+Parameters:
+  path    Directory to list (default: "/")
+
+Response:
+  {
+    "success": true,
+    "path": "/",
+    "format": "exFAT",        // Filesystem type (FAT16/FAT32/exFAT)
+    "cardSizeMB": 7680,       // Card capacity in MB
+    "files": [
+      {"name": "index.html", "size": 4096, "type": "file"},
+      {"name": "css", "size": 0, "type": "dir"},
+      {"name": "device.cfg", "size": 256, "type": "file"}
+    ]
+  }
+
+
+### GET /api/sdread?path=/filename.txt
+
+Reads file contents for the browser-based editor.
+
+Parameters:
+  path    File to read (required)
+
+Limits:
+  - Maximum file size: 32KB
+  - Content is JSON-escaped in response
+
+Response:
+  {"success": true, "size": 1234, "content": "file contents here..."}
+
+Errors:
+  {"success": false, "error": "File too large (max 32KB)"}
+
+
+### GET /api/sddownload?path=/filename.txt
+
+Downloads file as a browser attachment.
+
+Parameters:
+  path    File to download (required)
+
+Response:
+  HTTP 200 with Content-Disposition: attachment; filename="..."
+  Raw file bytes streamed to client
+
+
+### POST /api/sddelete
+
+Deletes a file or empty directory.
+
+Request body:
+  {"path": "/filename.txt"}
+
+Response:
+  {"success": true}
+  {"success": false, "error": "Delete failed (directory not empty?)"}
+
+
+### POST /api/sdwrite
+
+Saves file from the browser-based editor.
+
+Request body:
+  {"path": "/filename.txt", "content": "file contents..."}
+
+Limits:
+  - Maximum content size: 32KB
+  - JSON escape sequences (\n, \r, \t, \", \\) are unescaped
+
+Response:
+  {"success": true, "size": 1234}
+
+
+### POST /api/sdformat
+
+Formats the SD card. DESTRUCTIVE - all data will be lost.
+
+Request body:
+  {
+    "confirm": true,     // Required safety check
+    "type": "quick"      // Format type (see below)
+  }
+
+Format types:
+  "quick"   Delete all files (preserves filesystem)
+  "auto"    Full format, auto-select FAT32 or exFAT based on size
+  "fat32"   Force FAT16/FAT32 (cards ≤32GB only)
+  "exfat"   Force exFAT (any size)
+
+Response:
+  {"success": true, "message": "Formatted as exFAT (7680 MB)"}
+  {"success": false, "error": "Card too large for FAT32, use exFAT"}
+
+
+### POST /api/sdfileupload
+
+Uploads a file to the SD card via multipart form.
+
+Content-Type: multipart/form-data
+
+Form fields:
+  file    The file to upload (required)
+  path    Destination directory (optional, default: "/")
+
+Limits:
+  - Maximum file size: 64KB
+
+Response:
+  {"success": true, "filename": "style.css", "size": 2048}

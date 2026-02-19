@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 400" width="1200" height="400">
+  <title>7-Segment LCD Font - All Digits</title>
+  <desc>
+    Geometrically correct 7-segment LCD font.
+    Each digit consists of two overlapping squares (W × W) sharing segment G.
+    Height = 2W - t, where t = segment thickness (15% of width).
+    All gaps are equal at corners and center.
+  </desc>
+  
+  <!-- Background -->
+  <rect width="1200" height="400" fill="#000000"/>
+  
+  <!-- Title -->
+  <text x="600" y="40" font-family="sans-serif" font-size="24" fill="#888888" text-anchor="middle">
+    7-Segment LCD Font — Digits 0-9
+  </text>
+  
+  <defs>
+    <!-- 
+      Digit geometry (width=80):
+      - Width (W) = 80
+      - Thickness (t) = 12 (15% of 80)
+      - Half thickness (halfT) = 6
+      - Gap = 1.5 (12.5% of t, rounded)
+      - Height (H) = 2*80 - 12 = 148
+      - midY offset from top = W - halfT = 74 (center of segment G)
+      
+      Segment positions:
+      - Horizontal tips: x + halfT + gap to x + W - halfT - gap
+      - Vertical X centers: x + halfT (left), x + W - halfT (right)
+      - A (top): y = halfT = 6
+      - G (middle): y = 74
+      - D (bottom): y = H - halfT = 142
+      - Top vertical: from y + halfT + gap to midY - gap
+      - Bottom vertical: from midY + gap to y + H - halfT - gap
+    -->
+    
+    <!-- Horizontal segment template (centered at origin) -->
+    <!-- For W=80, t=12, halfT=6, gap=1.5: hLeft=7.5, hRight=72.5 -->
+    
+    <!-- Segment A (top horizontal) - path relative to digit origin -->
+    <path id="segA" d="M 7.5,6 L 13.5,0 L 66.5,0 L 72.5,6 L 66.5,12 L 13.5,12 Z"/>
+    
+    <!-- Segment G (middle horizontal) -->
+    <path id="segG" d="M 7.5,74 L 13.5,68 L 66.5,68 L 72.5,74 L 66.5,80 L 13.5,80 Z"/>
+    
+    <!-- Segment D (bottom horizontal) -->
+    <path id="segD" d="M 7.5,142 L 13.5,136 L 66.5,136 L 72.5,142 L 66.5,148 L 13.5,148 Z"/>
+    
+    <!-- Segment F (top-left vertical) -->
+    <!-- cx=6, topTip=7.5, botTip=72.5 -->
+    <path id="segF" d="M 6,7.5 L 12,13.5 L 12,66.5 L 6,72.5 L 0,66.5 L 0,13.5 Z"/>
+    
+    <!-- Segment B (top-right vertical) -->
+    <!-- cx=74, topTip=7.5, botTip=72.5 -->
+    <path id="segB" d="M 74,7.5 L 80,13.5 L 80,66.5 L 74,72.5 L 68,66.5 L 68,13.5 Z"/>
+    
+    <!-- Segment E (bottom-left vertical) -->
+    <!-- cx=6, topTip=75.5, botTip=140.5 -->
+    <path id="segE" d="M 6,75.5 L 12,81.5 L 12,134.5 L 6,140.5 L 0,134.5 L 0,81.5 Z"/>
+    
+    <!-- Segment C (bottom-right vertical) -->
+    <!-- cx=74, topTip=75.5, botTip=140.5 -->
+    <path id="segC" d="M 74,75.5 L 80,81.5 L 80,134.5 L 74,140.5 L 68,134.5 L 68,81.5 Z"/>
+  </defs>
+  
+  <!-- Digit color -->
+  <g fill="#00FF00">
+    
+    <!-- Digit 0: A, B, C, D, E, F (no G) -->
+    <g transform="translate(40, 80)">
+      <use href="#segA"/>
+      <use href="#segB"/>
+      <use href="#segC"/>
+      <use href="#segD"/>
+      <use href="#segE"/>
+      <use href="#segF"/>
+    </g>
+    <text x="80" y="260" font-family="sans-serif" font-size="20" fill="#666666" text-anchor="middle">0</text>
+    
+    <!-- Digit 1: B, C -->
+    <g transform="translate(150, 80)">
+      <use href="#segB"/>
+      <use href="#segC"/>
+    </g>
+    <text x="190" y="260" font-family="sans-serif" font-size="20" fill="#666666" text-anchor="middle">1</text>
+    
+    <!-- Digit 2: A, B, G, E, D -->
+    <g transform="translate(260, 80)">
+      <use href="#segA"/>
+      <use href="#segB"/>
+      <use href="#segG"/>
+      <use href="#segE"/>
+      <use href="#segD"/>
+    </g>
+    <text x="300" y="260" font-family="sans-serif" font-size="20" fill="#666666" text-anchor="middle">2</text>
+    
+    <!-- Digit 3: A, B, G, C, D -->
+    <g transform="translate(370, 80)">
+      <use href="#segA"/>
+      <use href="#segB"/>
+      <use href="#segG"/>
+      <use href="#segC"/>
+      <use href="#segD"/>
+    </g>
+    <text x="410" y="260" font-family="sans-serif" font-size="20" fill="#666666" text-anchor="middle">3</text>
+    
+    <!-- Digit 4: F, G, B, C -->
+    <g transform="translate(480, 80)">
+      <use href="#segF"/>
+      <use href="#segG"/>
+      <use href="#segB"/>
+      <use href="#segC"/>
+    </g>
+    <text x="520" y="260" font-family="sans-serif" font-size="20" fill="#666666" text-anchor="middle">4</text>
+    
+    <!-- Digit 5: A, F, G, C, D -->
+    <g transform="translate(590, 80)">
+      <use href="#segA"/>
+      <use href="#segF"/>
+      <use href="#segG"/>
+      <use href="#segC"/>
+      <use href="#segD"/>
+    </g>
+    <text x="630" y="260" font-family="sans-serif" font-size="20" fill="#666666" text-anchor="middle">5</text>
+    
+    <!-- Digit 6: A, F, G, E, C, D -->
+    <g transform="translate(700, 80)">
+      <use href="#segA"/>
+      <use href="#segF"/>
+      <use href="#segG"/>
+      <use href="#segE"/>
+      <use href="#segC"/>
+      <use href="#segD"/>
+    </g>
+    <text x="740" y="260" font-family="sans-serif" font-size="20" fill="#666666" text-anchor="middle">6</text>
+    
+    <!-- Digit 7: A, B, C -->
+    <g transform="translate(810, 80)">
+      <use href="#segA"/>
+      <use href="#segB"/>
+      <use href="#segC"/>
+    </g>
+    <text x="850" y="260" font-family="sans-serif" font-size="20" fill="#666666" text-anchor="middle">7</text>
+    
+    <!-- Digit 8: All segments -->
+    <g transform="translate(920, 80)">
+      <use href="#segA"/>
+      <use href="#segB"/>
+      <use href="#segC"/>
+      <use href="#segD"/>
+      <use href="#segE"/>
+      <use href="#segF"/>
+      <use href="#segG"/>
+    </g>
+    <text x="960" y="260" font-family="sans-serif" font-size="20" fill="#666666" text-anchor="middle">8</text>
+    
+    <!-- Digit 9: A, B, C, D, F, G -->
+    <g transform="translate(1030, 80)">
+      <use href="#segA"/>
+      <use href="#segB"/>
+      <use href="#segC"/>
+      <use href="#segD"/>
+      <use href="#segF"/>
+      <use href="#segG"/>
+    </g>
+    <text x="1070" y="260" font-family="sans-serif" font-size="20" fill="#666666" text-anchor="middle">9</text>
+    
+  </g>
+  
+  <!-- Geometry notes -->
+  <text x="600" y="300" font-family="monospace" font-size="12" fill="#555555" text-anchor="middle">
+    Width=80  Height=148  Thickness=12 (15%)  Gap=1.5 (12.5% of t)
+  </text>
+  <text x="600" y="320" font-family="monospace" font-size="12" fill="#555555" text-anchor="middle">
+    Geometry: Two overlapping W×W squares sharing segment G. Height = 2W - t
+  </text>
+  <text x="600" y="340" font-family="monospace" font-size="12" fill="#555555" text-anchor="middle">
+    Segments: A=top, B=top-right, C=bottom-right, D=bottom, E=bottom-left, F=top-left, G=middle
+  </text>
+  
+</svg>

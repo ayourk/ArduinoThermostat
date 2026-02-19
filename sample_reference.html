@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>FocusPro TH5110D LCD Sample — All Elements Lit</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+}
+h1 { color: #fff; margin-bottom: 10px; font-weight: 300; }
+h2 { color: #aaa; margin-bottom: 20px; font-weight: 300; font-size: 14px; }
+.display-wrapper {
+  background: #2a2a2a;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+  display: inline-block;
+  margin-bottom: 20px;
+}
+#canvas { border: 3px solid #444; border-radius: 6px; display: block; }
+.legend {
+  background: rgba(255,255,255,0.1);
+  border-radius: 8px;
+  padding: 20px;
+  max-width: 700px;
+  color: #ccc;
+}
+.legend h3 { color: #fff; margin-bottom: 10px; }
+.legend table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+.legend th, .legend td {
+  padding: 6px 8px;
+  text-align: left;
+  border-bottom: 1px solid #444;
+  font-size: 13px;
+}
+.legend th { color: #fff; }
+.legend-item {
+  display: flex;
+  align-items: center;
+  margin: 6px 0;
+  font-size: 14px;
+}
+.legend-color {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  margin-right: 10px;
+  border: 1px solid #555;
+  flex-shrink: 0;
+}
+.note {
+  background: rgba(255, 200, 0, 0.2);
+  border: 1px solid #aa8800;
+  border-radius: 5px;
+  padding: 10px;
+  margin-top: 15px;
+  font-size: 13px;
+}
+</style>
+</head>
+<body>
+
+<h1>FocusPro TH5110D LCD &mdash; All Elements Lit</h1>
+<h2>320&times;240 canvas &bull; every SHOW_ variable = "1" &bull; all 88&deg; for segment test</h2>
+
+<div class="display-wrapper">
+  <canvas id="canvas" width="320" height="240"
+          style="background-color:black;"></canvas>
+</div>
+
+<div class="legend">
+  <h3>Template Variables (SHOW_ flags)</h3>
+  <table>
+    <tr><th>Variable</th><th>Region</th><th>Shown When</th></tr>
+    <tr><td style="color:#FFFF00">SHOW_INSIDE_LABEL</td><td>"Inside" label</td><td>Always</td></tr>
+    <tr><td style="color:#FF0000">SHOW_REPLACE_BATTERY</td><td>"Replace Battery"</td><td>Low battery (0 on PoE)</td></tr>
+    <tr><td style="color:#00FF00">SHOW_CURRENT_TEMP</td><td>Large 7-seg digits</td><td>Always</td></tr>
+    <tr><td style="color:#00FF00">SHOW_DEGREE_SYMBOL</td><td>Degree circle</td><td>Always</td></tr>
+    <tr><td style="color:#FFFF00">SHOW_HEAT_LABEL</td><td>"Heat" above Setting</td><td>Heat enabled</td></tr>
+    <tr><td style="color:#FFFF00">SHOW_COOL_LABEL</td><td>"Cool" above Setting</td><td>Cool enabled (0 heat-only)</td></tr>
+    <tr><td style="color:#FFFF00">SHOW_SETTING_LABEL</td><td>"Setting" label</td><td>Heat enabled</td></tr>
+    <tr><td style="color:#00FF00">SHOW_TARGET_TEMP</td><td>Small 7-seg digits</td><td>Heat enabled</td></tr>
+    <tr><td style="color:#FFFF00">SHOW_HEAT_ON</td><td>"Heat On" status</td><td>Furnace active</td></tr>
+    <tr><td style="color:#FFFF00">SHOW_COOL_ON</td><td>"Cool On" status</td><td>Compressor active (0 heat-only)</td></tr>
+    <tr><td style="color:#FFFF00">SHOW_AUX_HEAT_ON</td><td>"Auxiliary Heat On"</td><td>Aux heat active (0 no pump)</td></tr>
+    <tr><td style="color:#FFFF00">SHOW_FAN_BOX</td><td>Fan box outline</td><td>Always</td></tr>
+    <tr><td style="color:#FFFF00">SHOW_FAN_LABEL</td><td>"Fan" in header</td><td>Always</td></tr>
+    <tr><td style="color:#FFFF00">SHOW_LIGHT_LABEL</td><td>"Light" in header</td><td>Always</td></tr>
+    <tr><td style="color:#00FF00">SHOW_FAN_AUTO</td><td>Fan "Auto" lit</td><td>Fan auto mode</td></tr>
+    <tr><td style="color:#00FF00">SHOW_FAN_ON</td><td>Fan "On" lit</td><td>Fan always-on mode</td></tr>
+    <tr><td style="color:#FFFF00">SHOW_SYSTEM_BOX</td><td>System box outline</td><td>Always</td></tr>
+    <tr><td style="color:#00FF00">SHOW_SYS_HEAT</td><td>System "Heat" lit</td><td>Heat enabled</td></tr>
+    <tr><td style="color:#00FF00">SHOW_SYS_OFF</td><td>System "Off" lit</td><td>System off</td></tr>
+    <tr><td style="color:#00FF00">SHOW_SYS_COOL</td><td>System "Cool" lit</td><td>Cool enabled (0 heat-only)</td></tr>
+    <tr><td style="color:#00FF00">SHOW_SYS_AUTO</td><td>System "Auto" lit</td><td>Auto mode (0 heat-only)</td></tr>
+  </table>
+
+  <h3 style="margin-top:20px;">Color Legend</h3>
+  <div class="legend-item">
+    <div class="legend-color" style="background:#00FF00;"></div>
+    <span>Green (#00FF00) &mdash; Temperature digits, active mode values</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-color" style="background:#FFFF00;"></div>
+    <span>Yellow (#FFFF00) &mdash; Labels and status indicators</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-color" style="background:#FF0000;"></div>
+    <span>Red (#FF0000) &mdash; Warnings (Replace Battery)</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-color" style="background:#006600; border-color:#888;"></div>
+    <span>Dim green (#006600) &mdash; Inactive mode values</span>
+  </div>
+
+  <div class="note">
+    <strong>Positioning note:</strong> Large digits use W=48 (H=89px,
+    y=38..127). Small digits use W=32 (H=59px, y=48..107). Status
+    text starts at y=115, below both digit regions. Fan/System boxes
+    start at y=152 with 80px height, ending at y=232 within the
+    240px canvas.
+  </div>
+</div>
+
+<h1 style="margin-top:40px;">Firmware v1.0 &mdash; Actual Canvas Positions</h1>
+<h2>320&times;240 canvas &bull; heat enabled + active &bull; 88&deg; for segment test</h2>
+
+<div class="display-wrapper">
+  <canvas id="canvas2" width="320" height="240"
+          style="background-color:black;"></canvas>
+</div>
+
+<div class="legend">
+  <h3>Template Variables (SHOW_ flags) &mdash; Firmware v1.0</h3>
+  <table>
+    <tr><th>Variable</th><th>Region</th><th>Shown When</th></tr>
+    <tr><td style="color:#FFFF00">SHOW_INSIDE_LABEL</td><td>"Inside" label (x=5, y=20)</td><td>Always</td></tr>
+    <tr><td style="color:#00FF00">SHOW_CURRENT_TEMP</td><td>Large 7-seg digits (W=54, x=5, y=28)</td><td>Always</td></tr>
+    <tr><td style="color:#00FF00">SHOW_DEGREE_SYMBOL</td><td>Degree circle after large digits</td><td>Always</td></tr>
+    <tr><td style="color:#FFFF00">SHOW_HEAT_LABEL</td><td>"Heat" label (x=230, y=35)</td><td>Heat enabled</td></tr>
+    <tr><td style="color:#FFFF00">SHOW_HEAT_SETTING</td><td>"Setting" label (x=220, y=52)</td><td>Heat enabled</td></tr>
+    <tr><td style="color:#00FF00">SHOW_TARGET_TEMP</td><td>Small 7-seg digits (W=36, x=218, y=60)</td><td>Heat enabled</td></tr>
+    <tr><td style="color:#FFFF00">SHOW_HEAT_ON</td><td>"Heat On" status (x=140, y=128)</td><td>Heat enabled + furnace active</td></tr>
+    <tr><td style="color:#FFFF00">SHOW_LIGHT_BUTTON</td><td>Left box + "Light" label (x=15, y=145, 140&times;90)</td><td>Always</td></tr>
+    <tr><td style="color:#FFFF00">SHOW_SYSTEM_BUTTON</td><td>Right box + "System" label (x=170, y=145, 140&times;90)</td><td>Always</td></tr>
+    <tr><td style="color:#FFFF00">SHOW_MINUS</td><td>Touch zone 3 (bottom-left, decrease target)</td><td>Always (touch only)</td></tr>
+    <tr><td style="color:#FFFF00">SHOW_PLUS</td><td>Touch zone 4 (bottom-right, increase target)</td><td>Always (touch only)</td></tr>
+    <tr><td style="color:#00FF00">SHOW_BME_CARD</td><td>Environment card below canvas in page</td><td>BME280 or BME680 present</td></tr>
+  </table>
+
+  <div class="note">
+    <strong>Differences from original mockup above:</strong> Large digits W=54 (was 48),
+    y=28 (was 38). Small digits W=36 (was 32), x=218 y=60 (was 200, 48). Boxes at
+    y=145 w=140 (was y=152 w=148). Features not implemented: Cool, Aux Heat, Fan
+    control, Replace Battery warning, System mode cycling.
+  </div>
+</div>
+
+<script>
+/* ---- This is the SAME rendering code as index.html template,
+   with all SHOW_ flags forced to true for demonstration ---- */
+
+var canvas = document.getElementById('canvas');
+var ctx = canvas.getContext('2d');
+
+var S = {
+  '0':[1,1,1,1,1,1,0], '1':[0,1,1,0,0,0,0], '2':[1,1,0,1,1,0,1],
+  '3':[1,1,1,1,0,0,1], '4':[0,1,1,0,0,1,1], '5':[1,0,1,1,0,1,1],
+  '6':[1,0,1,1,1,1,1], '7':[1,1,1,0,0,0,0], '8':[1,1,1,1,1,1,1],
+  '9':[1,1,1,1,0,1,1], ' ':[0,0,0,0,0,0,0]
+};
+
+function d7(x, y, d, W, c) {
+  var s = S[d] || S['8'];
+  var t = Math.max(3, Math.round(W * 0.15));
+  var h = t / 2;
+  var g = Math.max(1, Math.round(t * 0.12));
+  var H = 2 * W - t;
+  var m = y + W - h;
+  ctx.fillStyle = c;
+
+  function hS(l, r, cy) {
+    ctx.beginPath();
+    ctx.moveTo(l,cy); ctx.lineTo(l+h,cy-h); ctx.lineTo(r-h,cy-h);
+    ctx.lineTo(r,cy); ctx.lineTo(r-h,cy+h); ctx.lineTo(l+h,cy+h);
+    ctx.closePath(); ctx.fill();
+  }
+  function vS(cx, t2, b) {
+    ctx.beginPath();
+    ctx.moveTo(cx,t2); ctx.lineTo(cx+h,t2+h); ctx.lineTo(cx+h,b-h);
+    ctx.lineTo(cx,b); ctx.lineTo(cx-h,b-h); ctx.lineTo(cx-h,t2+h);
+    ctx.closePath(); ctx.fill();
+  }
+
+  var aY=y+h, gY=m, dY=y+H-h;
+  var hL=x+h+g, hR=x+W-h-g, vL=x+h, vR=x+W-h;
+  var tT=y+h+g, tB=m-g, bT=m+g, bB=y+H-h-g;
+
+  if(s[0]) hS(hL,hR,aY);
+  if(s[1]) vS(vR,tT,tB);
+  if(s[2]) vS(vR,bT,bB);
+  if(s[3]) hS(hL,hR,dY);
+  if(s[4]) vS(vL,bT,bB);
+  if(s[5]) vS(vL,tT,tB);
+  if(s[6]) hS(hL,hR,gY);
+  return W + 4;
+}
+
+function dN(x, y, n, W, c) {
+  var s = Math.abs(n).toString().padStart(2, '0');
+  for (var i = 0; i < s.length; i++) x += d7(x, y, s[i], W, c);
+  return x;
+}
+
+function dS(x, y, str, W, c) {
+  for (var i = 0; i < str.length; i++) x += d7(x, y, str[i], W, c);
+  return x;
+}
+
+function dD(x, y, c, size) {
+  ctx.strokeStyle = c;
+  ctx.lineWidth = size * 0.3;
+  ctx.beginPath();
+  ctx.arc(x + size/2, y + size/2, size * 0.4, 0, Math.PI * 2);
+  ctx.stroke();
+}
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+/* ===== TOP LEFT: "Inside" label ===== */
+ctx.font = 'bold 14px sans-serif';
+ctx.textBaseline = 'top';
+ctx.textAlign = 'left';
+ctx.fillStyle = '#FFFF00';
+ctx.fillText('Inside', 8, 8);
+
+/* ===== TOP LEFT: "Replace Battery" warning ===== */
+ctx.font = 'bold 14px sans-serif';
+ctx.textBaseline = 'top';
+ctx.fillStyle = '#FF0000';
+ctx.fillText('Replace', 70, 5);
+ctx.fillText('Battery', 70, 18);
+
+/* ===== LEFT: Large current temperature (W=48, all 8s) ===== */
+var lgW = 48;
+var lgX = 10, lgY = 38;
+var ex = dS(lgX, lgY, '88', lgW, '#00FF00');
+dD(ex + 4, lgY, '#00FF00', 14);
+
+/* ===== TOP RIGHT: "Heat" / "Cool" labels side by side ===== */
+ctx.font = 'bold 14px sans-serif';
+ctx.textBaseline = 'alphabetic';
+ctx.fillStyle = '#FFFF00';
+ctx.fillText('Heat', 195, 22);
+ctx.fillText('Cool', 255, 22);
+
+/* ===== "Setting" label below Heat/Cool ===== */
+ctx.textBaseline = 'top';
+ctx.fillText('Setting', 215, 26);
+
+/* ===== RIGHT: Smaller target temperature (W=32, all 8s) ===== */
+var smW = 32;
+var smX = 200, smY = 48;
+var tx = dN(smX, smY, 88, smW, '#00FF00');
+dD(tx + 2, smY, '#00FF00', 10);
+
+/* ===== STATUS: "Heat On" indicator ===== */
+ctx.font = 'bold 14px sans-serif';
+ctx.textBaseline = 'top';
+ctx.fillStyle = '#FFFF00';
+ctx.fillText('Heat On', 164, 115);
+
+/* ===== STATUS: "Cool On" indicator ===== */
+ctx.fillText('Cool On', 230, 115);
+
+/* ===== STATUS: "Auxiliary Heat On" indicator ===== */
+ctx.font = '12px sans-serif';
+ctx.fillText('Auxiliary Heat On', 164, 133);
+
+/* ===== BOTTOM LEFT: Fan box ===== */
+var fanX = 8, fanY = 152, fanW = 148, fanH = 80;
+ctx.strokeStyle = '#FFFF00';
+ctx.lineWidth = 2;
+roundRect(fanX, fanY, fanW, fanH, 8);
+ctx.stroke();
+
+ctx.font = 'bold 14px sans-serif';
+ctx.textBaseline = 'top';
+ctx.fillStyle = '#FFFF00';
+ctx.fillText('Fan', fanX + 10, fanY + 8);
+ctx.fillText('Light', fanX + 80, fanY + 8);
+
+var fanUL = fanY + 26;
+ctx.beginPath();
+ctx.moveTo(fanX + 8, fanUL);
+ctx.lineTo(fanX + fanW - 8, fanUL);
+ctx.stroke();
+
+/* All fan modes lit for sample */
+ctx.font = '14px sans-serif';
+ctx.fillStyle = '#00FF00';
+ctx.fillText('Auto', fanX + 12, fanUL + 4);
+ctx.fillText('On', fanX + 70, fanUL + 4);
+
+/* ===== BOTTOM RIGHT: System box ===== */
+var sysX = 164, sysY = 152, sysW = 148, sysH = 80;
+ctx.strokeStyle = '#FFFF00';
+ctx.lineWidth = 2;
+roundRect(sysX, sysY, sysW, sysH, 8);
+ctx.stroke();
+
+ctx.font = 'bold 14px sans-serif';
+ctx.textBaseline = 'top';
+ctx.fillStyle = '#FFFF00';
+ctx.fillText('System', sysX + 10, sysY + 8);
+
+var sysUL = sysY + 26;
+ctx.beginPath();
+ctx.moveTo(sysX + 8, sysUL);
+ctx.lineTo(sysX + sysW - 8, sysUL);
+ctx.stroke();
+
+/* All system modes lit for sample */
+ctx.font = '14px sans-serif';
+ctx.fillStyle = '#00FF00';
+ctx.fillText('Heat', sysX + 12, sysUL + 4);
+ctx.fillText('Off', sysX + 80, sysUL + 4);
+ctx.fillText('Cool', sysX + 12, sysUL + 24);
+ctx.fillText('Auto', sysX + 80, sysUL + 24);
+
+/* ============================================================
+   SECOND CANVAS: Firmware v1.0 actual positions
+   Reassign ctx to canvas2 -- d7/dN/dS use the global ctx
+   Redefine dD to match firmware signature: dD(x, y, W, c)
+   Canvas1 is already fully rendered above.
+   ============================================================ */
+ctx = document.getElementById('canvas2').getContext('2d');
+
+/* Firmware dD signature: dD(x, y, W, c) where size = round(W*0.25).
+   Assignment (not declaration) so canvas1's dD is already done before this runs. */
+dD = function(x, y, W, c) {
+  var s = Math.round(W * 0.25);
+  ctx.strokeStyle = c;
+  ctx.lineWidth = Math.max(1, Math.round(s * 0.2));
+  ctx.beginPath();
+  ctx.arc(x + s / 2, y + s / 2, s / 2 - ctx.lineWidth, 0, Math.PI * 2);
+  ctx.stroke();
+}
+
+ctx.textAlign = 'left';
+ctx.textBaseline = 'alphabetic';  /* firmware default -- no explicit reset */
+
+/* "Inside" label: x=5, y=20 (baseline), 16px */
+ctx.fillStyle = '#FFFF00';
+ctx.font = '16px sans-serif';
+ctx.fillText('Inside', 5, 20);
+
+/* Large current temp: W=54, x=5, y=28 */
+var ex2 = dS(5, 28, '88', 54, '#00FF00');
+dD(ex2 + 2, 28, 54, '#00FF00');
+
+/* Heat enabled: "Heat" x=230 y=35, "Setting" x=220 y=52 */
+ctx.fillStyle = '#FFFF00';
+ctx.font = '14px sans-serif';
+ctx.fillText('Heat', 230, 35);
+ctx.fillText('Setting', 220, 52);
+
+/* Small target temp: W=36, x=218, y=60 */
+var tx2 = dN(218, 60, 88, 36, '#00FF00');
+dD(tx2 + 2, 60, 36, '#00FF00');
+
+/* "Heat On" status: x=140, y=128, 12px */
+ctx.fillStyle = '#FFFF00';
+ctx.font = '12px sans-serif';
+ctx.fillText('Heat On', 140, 128);
+
+/* Left box (Light): roundRect(15, 145, 140, 90, 5) */
+ctx.strokeStyle = '#FFFF00';
+ctx.lineWidth = 1;
+ctx.beginPath();
+ctx.roundRect(15, 145, 140, 90, 5);
+ctx.stroke();
+
+/* Right box (System): roundRect(170, 145, 140, 90, 5) */
+ctx.beginPath();
+ctx.roundRect(170, 145, 140, 90, 5);
+ctx.stroke();
+
+/* Box labels: "Light" x=65 y=163, "System" x=215 y=163 */
+ctx.fillStyle = '#FFFF00';
+ctx.font = 'bold 14px sans-serif';
+ctx.fillText('Light', 65, 163);
+ctx.fillText('System', 215, 163);
+
+/* Divider lines at y=170 */
+ctx.beginPath();
+ctx.moveTo(15, 170);  ctx.lineTo(155, 170);
+ctx.moveTo(170, 170); ctx.lineTo(310, 170);
+ctx.stroke();
+
+/* "Heat" in System box: x=225, y=190, when heat enabled */
+ctx.fillStyle = '#FFFF00';
+ctx.font = '14px sans-serif';
+ctx.fillText('Heat', 225, 190);
+</script>
+
+</body>
+</html>

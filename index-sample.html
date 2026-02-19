@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html><head>
+<title>Thermostat</title>
+<meta name='viewport' content='width=device-width,initial-scale=1'>
+<!-- {* FocusPro Thermostat -- Smarty template (edit to customize) *} -->
+{literal}<style>
+body{font-family:Arial,sans-serif;background:#000;color:#eee;margin:20px;}
+.container{max-width:420px;margin:0 auto;}
+.card{background:#16213e;border-radius:10px;padding:15px;margin:10px 0;min-width:200px;}
+.label{color:#888;font-size:0.9em;margin-bottom:6px;}
+.row{display:flex;justify-content:space-between;margin:8px 0;}
+.value{color:#60a5fa;}
+.heat-on{color:#fbbf24;font-weight:bold;}
+#status{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;}
+.online{background:#22c55e;}.offline{background:#ef4444;}.stale{background:#eab308;}
+canvas{cursor:pointer;}
+</style>{/literal}
+</head><body>
+<div class='container'>
+<div style='display:flex;align-items:center;gap:10px;'>
+<canvas id='cv' width='320' height='240' style='background:#000;border-radius:4px;'></canvas>
+<div style='display:flex;flex-direction:column;gap:8px;'>
+<button id='btnUp' onclick='adjTemp(1)' style='width:50px;height:70px;font-size:28px;background:#222;color:#0a0;border:2px solid #444;border-radius:6px;cursor:pointer;'>&#9650;</button>
+<button id='btnDown' onclick='adjTemp(-1)' style='width:50px;height:70px;font-size:28px;background:#222;color:#0a0;border:2px solid #444;border-radius:6px;cursor:pointer;'>&#9660;</button>
+</div>
+</div>
+<div style='margin-top:4px;font-size:11px;color:#555;'>
+<span id='status' class='online'></span><span id='statusText'>Connected</span></div>
+<div id='cards'></div>
+</div>
+<div style='text-align:center;margin-top:10px;'>
+<a href='/config' style='color:#4ade80;font-size:12px;'>&#9881; Configuration</a>
+ &middot;
+<a href='/sdfiles' style='color:#fbbf24;font-size:12px;'>&#128193; SD Files</a>
+ &middot;
+<a href='/update' style='color:#888;font-size:12px;'>&#128295; Firmware Update</a>
+</div>
+<script>
+var seedTemp = {$CURRENT_TEMP};
+var seedTarget = {$TARGET_TEMP};
+var seedHeatOn = {$HEAT_ENABLED};
+var seedHeatActive = {$HEAT_ACTIVE};
+var seedColor = '{$TEMP_COLOR}';
+</script>
+{literal}<script>
+var cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+var S={'0':[1,1,1,1,1,1,0],'1':[0,1,1,0,0,0,0],'2':[1,1,0,1,1,0,1],'3':[1,1,1,1,0,0,1],'4':[0,1,1,0,0,1,1],'5':[1,0,1,1,0,1,1],'6':[1,0,1,1,1,1,1],'7':[1,1,1,0,0,0,0],'8':[1,1,1,1,1,1,1],'9':[1,1,1,1,0,1,1]};
+function d7(x,y,d,W,c){var s=S[d]||S['8'],t=Math.max(3,Math.round(W*0.15)),h=t/2,g=Math.max(1,Math.round(t*0.12)),H=2*W-t,m=y+W-h;ctx.fillStyle=c;
+function hS(l,r,cy){ctx.beginPath();ctx.moveTo(l,cy);ctx.lineTo(l+h,cy-h);ctx.lineTo(r-h,cy-h);ctx.lineTo(r,cy);ctx.lineTo(r-h,cy+h);ctx.lineTo(l+h,cy+h);ctx.closePath();ctx.fill();}
+function vS(cx,t,b){ctx.beginPath();ctx.moveTo(cx,t);ctx.lineTo(cx+h,t+h);ctx.lineTo(cx+h,b-h);ctx.lineTo(cx,b);ctx.lineTo(cx-h,b-h);ctx.lineTo(cx-h,t+h);ctx.closePath();ctx.fill();}
+var aY=y+h,gY=m,dY=y+H-h,hL=x+h+g,hR=x+W-h-g,vL=x+h,vR=x+W-h,tT=y+h+g,tB=m-g,bT=m+g,bB=y+H-h-g;
+if(s[0])hS(hL,hR,aY);if(s[1])vS(vR,tT,tB);if(s[2])vS(vR,bT,bB);if(s[3])hS(hL,hR,dY);if(s[4])vS(vL,bT,bB);if(s[5])vS(vL,tT,tB);if(s[6])hS(hL,hR,gY);
+return W+4;}
+function dN(x,y,n,W,c){var s=Math.abs(n).toString().padStart(2,'0');for(var i=0;i<s.length;i++)x+=d7(x,y,s[i],W,c);return x;}
+function dD(x,y,W,c){var s=Math.round(W*0.25);ctx.strokeStyle=c;ctx.lineWidth=Math.max(1,Math.round(s*0.2));ctx.beginPath();ctx.arc(x+s/2,y+s/2,s/2-ctx.lineWidth,0,Math.PI*2);ctx.stroke();}
+var st=null,failCount=0;
+function drawAll(s){ctx.clearRect(0,0,320,240);
+ctx.fillStyle='#FFFF00';ctx.font='16px sans-serif';ctx.fillText('Inside',5,20);
+var tc=s.tempColor||'#00FF00';var ex=dN(5,28,s.currentTemp,54,tc);dD(ex+2,28,54,tc);
+if(s.heatEnabled){ctx.fillStyle='#FFFF00';ctx.font='14px sans-serif';ctx.fillText('Heat',230,35);ctx.fillText('Setting',220,52);
+var tx=dN(218,60,s.targetTemp,36,'#00FF00');dD(tx+2,60,36,'#00FF00');}
+if(s.heatEnabled&&s.heatActive){ctx.fillStyle='#FFFF00';ctx.font='12px sans-serif';ctx.fillText('Heat On',140,128);}
+ctx.strokeStyle='#FFFF00';ctx.lineWidth=1;
+ctx.beginPath();ctx.roundRect(15,145,140,90,5);ctx.stroke();
+ctx.beginPath();ctx.roundRect(170,145,140,90,5);ctx.stroke();
+ctx.fillStyle='#FFFF00';ctx.font='bold 14px sans-serif';ctx.fillText('Light',65,163);ctx.fillText('System',215,163);
+ctx.beginPath();ctx.moveTo(15,170);ctx.lineTo(155,170);ctx.moveTo(170,170);ctx.lineTo(310,170);ctx.stroke();
+if(s.heatEnabled){ctx.fillStyle='#FFFF00';ctx.font='14px sans-serif';ctx.fillText('Heat',225,190);}
+}
+function buildCards(s){var h='';
+if(s.environment){var e=s.environment;h+="<div class='card'><div class='label'>ENVIRONMENT ("+e.sensor+")</div>";
+if(e.humidity!=null)h+="<div class='row'><span>Humidity</span><span class='value'>"+e.humidity.toFixed(1)+"%</span></div>";
+if(e.pressInhg!=null)h+="<div class='row'><span>Pressure</span><span class='value'>"+e.pressInhg.toFixed(2)+" inHg</span></div>";
+if(e.gasKohms!=null)h+="<div class='row'><span>Gas</span><span class='value'>"+e.gasKohms.toFixed(1)+" kOhms</span></div>";
+if(e.dewPoint!=null)h+="<div class='row'><span>Dew Point</span><span class='value'>"+e.dewPoint.toFixed(1)+"&deg;F</span></div>";
+if(e.pressureTrend){var tc=(e.pressureTrend.indexOf('Rising')>=0)?'#22c55e':(e.pressureTrend.indexOf('Falling')>=0)?'#ef4444':'#eab308';
+h+="<div class='row'><span>Trend</span><span class='value' style='color:"+tc+"'>"+e.pressureTrend+"</span></div>";}
+if(e.weatherPrediction)h+="<div class='row'><span>Forecast</span><span class='value'>"+e.weatherPrediction+"</span></div>";
+h+="</div>";}
+h+="<div class='card'><div class='label'>SYSTEM</div>";
+if(s.board)h+="<div class='row'><span>Board</span><span class='value'>"+s.board+"</span></div>";
+if(s.network){var n=s.network;
+if(n.mode==='dual'){
+if(n.ethernet){var e=n.ethernet;
+h+="<div class='row'><span>Eth IP</span><span class='value'>"+e.ip+"</span></div>";
+h+="<div class='row'><span>Eth MAC</span><span class='value'>"+e.mac+"</span></div>";
+var elc=e.link==='Connected'?'#22c55e':'#ef4444';
+h+="<div class='row'><span>Eth Link</span><span class='value' style='color:"+elc+"'>"+e.link+"</span></div>";}
+if(n.wifi){var w=n.wifi;
+h+="<div class='row'><span>WiFi IP</span><span class='value'>"+w.ip+"</span></div>";
+h+="<div class='row'><span>WiFi MAC</span><span class='value'>"+w.mac+"</span></div>";
+if(w.ssid)h+="<div class='row'><span>WiFi SSID</span><span class='value'>"+w.ssid+"</span></div>";
+var wlc=w.link==='Connected'?'#22c55e':'#ef4444';
+h+="<div class='row'><span>WiFi Link</span><span class='value' style='color:"+wlc+"'>"+w.link+"</span></div>";}
+}else{
+h+="<div class='row'><span>IP</span><span class='value'>"+n.ip+"</span></div>";
+if(n.mac)h+="<div class='row'><span>MAC</span><span class='value'>"+n.mac+"</span></div>";
+if(n.ssid)h+="<div class='row'><span>SSID</span><span class='value'>"+n.ssid+"</span></div>";
+var lc=n.link==='Connected'?'#22c55e':'#ef4444';
+h+="<div class='row'><span>Link</span><span class='value' style='color:"+lc+"'>"+n.link+"</span></div>";}}
+var u=s.uptime||0,sec=Math.floor(u/1000),m=Math.floor(sec/60)%60,hr=Math.floor(sec/3600)%24,d=Math.floor(sec/86400);
+h+="<div class='row'><span>Uptime</span><span class='value'>"+d+'d '+hr+'h '+m+'m'+"</span></div>";
+var hc=s.heatEnabled?'#22c55e':'#888';
+h+="<div class='row'><span>Heat</span><span class='value' style='color:"+hc+"'>"+(s.heatEnabled?'Enabled':'Off')+"</span></div>";
+if(s.heatEnabled&&s.heatActive){h+="<div class='row'><span>Furnace</span><span class='value' style='color:#fbbf24;font-weight:bold'>ACTIVE</span></div>";}
+if(s.sdCard!=null){var sdc=s.sdCard?'#22c55e':'#888';var sdtxt=s.sdCard?(s.sdFormat||'Present'):'None';
+h+="<div class='row'><span>SD Card</span><span class='value' style='color:"+sdc+"'>"+sdtxt+"</span></div>";}
+if(s.displayPresent!=null){var dc=s.displayPresent?'#22c55e':'#888';
+h+="<div class='row'><span>Display</span><span class='value' style='color:"+dc+"'>"+(s.displayPresent?'Connected':'Headless')+"</span></div>";}
+if(s.otaSupported)h+="<div class='row'><span>OTA Update</span><span class='value' style='color:#22c55e'>Supported</span></div>";
+if(s.network&&s.network.battery){var bv=s.network.battery;var bc=(bv>3.5)?'#22c55e':(bv<=3.3)?'#ef4444':'#eab308';
+h+="<div class='row'><span>Battery</span><span class='value' style='color:"+bc+"'>"+bv.toFixed(2)+"V</span></div>";}
+if(s.freeRam)h+="<div class='row'><span>Free RAM</span><span class='value'>"+(s.freeRam/1024).toFixed(1)+" KB</span></div>";
+h+="</div>";
+if(s.outdoor&&s.outdoor.configured){var o=s.outdoor;h+="<div class='card'><div class='label'>OUTDOOR UNIT</div>";
+var sc=o.status==='Online'?'#22c55e':o.status==='Offline'?'#ef4444':'#888';
+h+="<div class='row'><span>Status</span><span style='color:"+sc+"'>"+o.status+"</span></div>";
+h+="<div class='row'><span>IP</span><span class='value'>"+o.ip+":"+o.port+"</span></div>";
+if(o.status==='Online'){
+if(o.temp)h+="<div class='row'><span>Temp</span><span class='value'>"+o.temp+"&deg;F</span></div>";
+if(o.humidity)h+="<div class='row'><span>Humidity</span><span class='value'>"+o.humidity+"%</span></div>";
+if(o.pressInhg)h+="<div class='row'><span>Pressure</span><span class='value'>"+o.pressInhg+" inHg</span></div>";
+if(o.gasKohms)h+="<div class='row'><span>Gas</span><span class='value'>"+o.gasKohms+" kOhms</span></div>";}
+h+="</div>";}
+document.getElementById('cards').innerHTML=h;}
+function fetchState(){fetch('/api/state').then(function(r){return r.json();}).then(function(s){
+st=s;failCount=0;drawAll(s);buildCards(s);
+document.getElementById('status').className='online';document.getElementById('statusText').textContent='Connected';
+setTimeout(fetchState,1000);
+}).catch(function(e){failCount++;
+if(failCount>=3){document.getElementById('status').className='offline';document.getElementById('statusText').textContent='Disconnected';}
+else{document.getElementById('status').className='stale';document.getElementById('statusText').textContent='Retrying...';}
+setTimeout(fetchState,2000);});}
+function sendCmd(q){fetch('/api/set?'+q).then(function(){fetchState();});}
+function adjTemp(d){if(!st)return;sendCmd('target='+(st.targetTemp+d));}
+function handleClick(e){if(!st)return;e.preventDefault();var r=cv.getBoundingClientRect();var cx=e.clientX,cy=e.clientY;
+if(e.touches&&e.touches.length>0){cx=e.touches[0].clientX;cy=e.touches[0].clientY;}
+var x=(cx-r.left)*(320/r.width);var y=(cy-r.top)*(240/r.height);
+if(st.settingsScreen&&st.settingsScreen!=='off'){sendCmd('settings=toggle');return;}
+if(x>=15&&x<=155&&y<145){sendCmd('settings=toggle');return;}
+if(x>=15&&x<=155&&y>=170&&y<=235){sendCmd('target='+(st.targetTemp-1));return;}
+if(x>=170&&x<=310&&y>=170&&y<=235){sendCmd('target='+(st.targetTemp+1));return;}
+if(x>=170&&x<=310&&y<145){sendCmd('heat='+(st.heatEnabled?'off':'on'));return;}
+if(x>=15&&x<=155&&y>=145&&y<=170){sendCmd('settings=toggle');return;}
+if(x>=170&&x<=310&&y>=145&&y<=170){sendCmd('heat='+(st.heatEnabled?'off':'on'));return;}}
+cv.addEventListener('click',handleClick);cv.addEventListener('touchstart',handleClick);
+st={currentTemp:seedTemp,targetTemp:seedTarget,heatEnabled:seedHeatOn==1,heatActive:seedHeatActive==1,tempColor:seedColor};
+drawAll(st);fetchState();
+</script>{/literal}
+</body></html>
