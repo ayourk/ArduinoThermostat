@@ -1,5 +1,9 @@
 # eyeSPI Thermostat
 
+[![Build Firmware](https://github.com/ayourk/ArduinoThermostat/actions/workflows/build.yml/badge.svg)](https://github.com/ayourk/ArduinoThermostat/actions/workflows/build.yml)
+[![Release](https://img.shields.io/github/v/release/ayourk/ArduinoThermostat)](https://github.com/ayourk/ArduinoThermostat/releases/latest)
+[![License](https://img.shields.io/github/license/ayourk/ArduinoThermostat)](LICENSE)
+
 **Version 1.0**
 
 A smart thermostat with indoor/outdoor temperature monitoring, humidity, barometric pressure, and weather prediction. Designed for extreme weather conditions: -60°F to +120°F (-51°C to +49°C).
