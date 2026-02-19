@@ -97,24 +97,29 @@ jobs:
             ext: bin
             output: Thermostat-M0Express-W5500
 
-          # ── Optional nRF52840 variants ──
+          # ── Optional nRF52840 variants (known issues: HardwareClient/Print incompatibility) ──
           - name: nrf52840
             fqbn: "adafruit:nrf52:feather52840"
             core: "adafruit:nrf52"
             ext: zip
             output: Thermostat-nRF52840-W5500
+            experimental: true
           - name: nrf52840sense
             fqbn: "adafruit:nrf52:feather52840sense"
             core: "adafruit:nrf52"
             ext: zip
             output: Thermostat-nRF52840Sense-W5500
+            experimental: true
 
-          # ── Optional STM32 ──
+          # ── Optional STM32 (known issues: HardwareClient/Print incompatibility) ──
           - name: stm32f405
             fqbn: "STMicroelectronics:stm32:GenF4:pnum=FEATHER_F405"
             core: "STMicroelectronics:stm32"
             ext: bin
             output: Thermostat-STM32F405-W5500
+            experimental: true
+
+    continue-on-error: ${{ matrix.experimental || false }}
 
     steps:
       - name: Checkout

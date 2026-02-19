@@ -7153,20 +7153,16 @@ void handleSDFormat(HardwareClient& cl, long contentLength) {
     // Determine card size in MB for info
     uint32_t cardSizeMB = sectorCount / 2048;  // sectors * 512 / 1048576
 
-    // Close filesystem to allow raw format
+    // Close filesystem to allow raw format, then re-init for raw card access.
+    // Note: We use sd.begin() instead of card->begin() because SdCardInterface
+    // doesn't have begin() on all platforms (e.g. RP2040 with PIO SDIO).
     sd.end();
-
-    // Re-init card only (not filesystem)
-    if (!card->begin(spiConfig)) {
-      // Try full re-init
-      if (!sd.begin(SD_CS, SD_SCK_MHZ(4))) {
-        cl.println(F("{\"success\":false,\"error\":\"Card reinit failed\"}"));
-        sdCardPresent = false;
-        return;
-      }
-      card = sd.card();
-      sd.end();
+    if (!sd.begin(spiConfig)) {
+      cl.println(F("{\"success\":false,\"error\":\"Card reinit failed\"}"));
+      sdCardPresent = false;
+      return;
     }
+    card = sd.card();
 
     bool formatOk = false;
     String formatUsed = "";
