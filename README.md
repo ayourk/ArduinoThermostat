@@ -276,12 +276,12 @@ Output binaries are placed in the `binaries/` directory.
    - Adafruit MAX31865 library
    - Adafruit BusIO
    - Adafruit Unified Sensor
-   - pt100rtd
+   - pt100rtd (clone from [GitHub](https://github.com/drhaney/pt100rtd) — not in Library Manager)
    - ArduinoJson
    - SdFat (Adafruit Fork)
    - Ethernet
 
-3. Copy `arduino_secrets.h` to `arduino_secrets-local.h` and edit with your credentials
+3. Copy `arduino_secrets.h` to `arduino_secrets.local.h` and edit with your credentials
 4. Open `Thermostat.ino`
 5. Select your board from Tools → Board menu
 6. Compile and upload
@@ -301,7 +301,7 @@ See `SD-README.txt` for template syntax documentation.
 
 ## License
 
-MIT License - See LICENSE file for details.
+GNU General Public License v3.0 - See [LICENSE](LICENSE) for details.
 
 ## Contributing
 

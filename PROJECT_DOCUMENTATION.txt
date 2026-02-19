@@ -596,6 +596,7 @@ Optional boards (specify explicitly):
   esp32s2tft      Feather ESP32-S2 TFT       Native WiFi          .bin
   esp32s3tft      Feather ESP32-S3 TFT       Native WiFi          .bin
   esp32s3dual     Feather ESP32-S3           Dual: W5500 + WiFi   .bin
+  esp32v2         Feather ESP32 V2           Native WiFi          .bin
   esp32v2dual     Feather ESP32 V2           Dual: W5500 + WiFi   .bin
   nrf52840        Feather nRF52840           W5500 Ethernet       .zip
   nrf52840sense   Feather nRF52840 Sense     W5500 Ethernet       .zip
@@ -608,6 +609,28 @@ Build examples:
   ./build-all.sh all                # Build all boards (primary + optional)
   ./build-all.sh all nrf52840       # Build all primary + nRF52840
   ./build-all.sh -v esp32s2dual     # Verbose output
+  ./build-all.sh esp32s2dual --flash        # Build and flash (ESP32 only)
+  ./build-all.sh esp32s2 --flash --port /dev/ttyACM0  # Flash to specific port
+
+### Continuous Integration (GitHub Actions)
+
+The project includes a GitHub Actions workflow (.github/workflows/build.yml)
+that automatically builds firmware for all 17 board targets on every push
+to main and on pull requests. The workflow:
+
+  - Installs board cores and libraries via arduino-cli
+  - Clones pt100rtd from GitHub and patches it for cross-platform support
+  - Compiles each board target as a separate matrix job
+  - Uploads build artifacts (downloadable from the Actions tab)
+  - On GitHub Releases, attaches all binaries as release assets
+
+The nRF52840, nRF52840 Sense, and STM32F405 targets are marked as
+experimental (continue-on-error) in CI due to known platform-specific
+library resolution differences that may cause build failures in the CI
+environment even though they compile successfully locally.
+
+Build status badge:
+  [![Build Firmware](https://github.com/ayourk/ArduinoThermostat/actions/workflows/build.yml/badge.svg)](https://github.com/ayourk/ArduinoThermostat/actions/workflows/build.yml)
 
 ### Manual Compilation (Arduino IDE)
 
@@ -632,7 +655,7 @@ Build examples:
   Library               Purpose                       Install via
   --------------------  ----------------------------  ----------------------
   Adafruit_MAX31865     PT100 RTD temperature sensor  Arduino Library Manager
-  pt100rtd              RTD resistance-to-temp LUT    Arduino Library Manager
+  pt100rtd              RTD resistance-to-temp LUT    GitHub (see note below)
   Adafruit_GFX          Graphics primitives for TFT   Arduino Library Manager
   Adafruit_ILI9341      TFT display driver            Arduino Library Manager
   Adafruit_FT6206       Capacitive touch (CST826)     Arduino Library Manager
@@ -660,14 +683,36 @@ Version-specific checks are enforced for:
   SdFat       -- must be 2.x (v1 lacks typed file classes SdFat32/File32/
                  ExFile/FsFile required by the SD_FAT_TYPE typedefs)
 
-ESP32 Compatibility Note:
-  The pt100rtd library requires a small modification for ESP32. In the
-  file ~/Arduino/libraries/pt100rtd/pt100rtd.h, replace the pgmspace
-  include section with:
+pt100rtd Installation Note:
+  The pt100rtd library is not available in the Arduino Library Manager.
+  It must be cloned from GitHub:
 
-    #if defined(ESP32) || defined(ESP8266)
+    git clone https://github.com/drhaney/pt100rtd.git \
+      "$(arduino-cli config get directories.user)/libraries/pt100rtd"
+
+  The build script (build-all.sh --install-deps) handles this
+  automatically in Step 6 of the dependency installer.
+
+Cross-Platform Compatibility Note:
+  The upstream pt100rtd library has a simplistic pgmspace.h include
+  block that only handles AVR vs non-AVR. This fails on platforms like
+  SAMD, RP2040, nRF52, and STM32 where <pgmspace.h> isn't available
+  at the expected path. In ~/Arduino/libraries/pt100rtd/pt100rtd.h,
+  replace the upstream pgmspace block:
+
+    #if (defined(__AVR__))
+    #include <avr\pgmspace.h>
+    #else
+    #include <pgmspace.h>
+    #endif
+
+  With a comprehensive cross-platform version:
+
+    #if defined(__AVR__)
+      #include <avr/pgmspace.h>
+    #elif defined(ESP32) || defined(ESP8266)
       #include <pgmspace.h>
-    #elif defined(__AVR__) || defined(__arm__) || defined(__SAMD21__) || defined(__SAMD51__)
+    #elif defined(__arm__) || defined(__SAMD21__) || defined(__SAMD51__)
       #include <avr/pgmspace.h>
     #else
       #ifndef PROGMEM
@@ -679,7 +724,8 @@ ESP32 Compatibility Note:
     #endif
 
   The build script (build-all.sh --install-deps) applies this patch
-  automatically when installing dependencies.
+  automatically. The CI workflow also patches automatically after
+  cloning from GitHub.
 
 Additional header files (included in project):
 
@@ -1919,8 +1965,8 @@ is used:
     ETH_* and WIFI_* keys.
 
 WIFI_SSID and WIFI_PASS override the compile-time SECRET_SSID and
-SECRET_PASS from arduino_secrets.h. See WiFi Configuration for the
-full priority chain.
+SECRET_PASS from arduino_secrets.h (or arduino_secrets.local.h if
+present). See WiFi Configuration for the full priority chain.
 
 WIFI_SECURITY specifies the security type when connecting to a WiFi
 network. Values are not case sensitive. The mapping to WiFi101
@@ -2251,7 +2297,10 @@ each level overriding the previous:
   1 (low)    arduino_secrets.h  Compile-time defaults (SECRET_SSID,
                                 SECRET_PASS). Ships as SSID "ANY" with
                                 empty password. Requires recompiling to
-                                change.
+                                change. If arduino_secrets.local.h exists,
+                                it is used instead (via __has_include).
+                                The .local.h file is gitignored so real
+                                credentials stay out of version control.
   2 (mid)    device.cfg on SD   WIFI_SSID and WIFI_PASS keys. Loaded at
                                 boot. Can be prepopulated before first
                                 deployment (see First-Boot Prepopulation
@@ -2266,18 +2315,27 @@ each level overriding the previous:
                                 to device.cfg and take effect on reboot.
 
 At boot, the firmware reads the active SSID and password (from
-device.cfg if present, otherwise from arduino_secrets.h) and calls
-WiFi.begin(ssid, pass). The active SSID is printed to Serial during
-connection. Connection blocks with a 30-second timeout (dot-print
-progress on Serial).
+device.cfg if present, otherwise from arduino_secrets.local.h or
+arduino_secrets.h) and calls WiFi.begin(ssid, pass). The active SSID
+is printed to Serial during connection. Connection blocks with a
+30-second timeout (dot-print progress on Serial).
 
-The special SSID string "ANY" (case-sensitive) instructs the WINC1500
-to connect to the first or closest unsecured (open) access point
-without requiring a password. This default is provided for initial
-setup convenience only and is not recommended for regular use, as it
-connects to any nearby open network without authentication. Users
-should configure a specific SSID and password via device.cfg or the
-/config web form before deployment.
+The special SSID string "ANY" (case-sensitive) triggers automatic
+open-network discovery instead of connecting to a named SSID:
+
+  - WINC1500: calls WiFi.begin() with no arguments, which invokes the
+    ATWINC1500's m2m_wifi_default_connect() function to connect to the
+    first available open access point.
+  - ESP32: scans all nearby networks via WiFi.scanNetworks(), selects
+    the strongest open (unencrypted, WIFI_AUTH_OPEN) access point by
+    RSSI, and connects to it. The chosen SSID and RSSI are logged to
+    Serial.
+
+This default ships in arduino_secrets.h for initial setup convenience
+and is not recommended for regular use, as it connects to any nearby
+open network without authentication. Users should configure a specific
+SSID and password via device.cfg or the /config web form before
+deployment.
 
 WiFi Network Scanning:
 

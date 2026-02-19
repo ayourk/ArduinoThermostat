@@ -350,81 +350,78 @@ install_deps() {
     echo "=============================================="
     echo ""
     
-    # Attempt to patch pt100rtd library for ESP32 compatibility
+    # Attempt to patch pt100rtd library for cross-platform compatibility
     patch_pt100rtd
     
     echo "Run './build-all.sh' to build all primary firmware variants."
 }
 
-# Patch pt100rtd library for ESP32 compatibility
-# ESP32 needs <pgmspace.h> instead of <avr/pgmspace.h>
-# Also adds fallback PROGMEM defines for other platforms
+# Patch pt100rtd library for cross-platform pgmspace.h compatibility
+# The upstream library has a simplistic AVR-vs-everything block that fails
+# on SAMD, RP2040, nRF52, and STM32 platforms.
 patch_pt100rtd() {
-    echo -e "${YELLOW}Checking pt100rtd library for ESP32 compatibility...${NC}"
-    
+    echo -e "${YELLOW}Checking pt100rtd library for cross-platform compatibility...${NC}"
+
     # Find pt100rtd library location
     local lib_path
     lib_path=$(arduino-cli config get directories.user 2>/dev/null)/libraries/pt100rtd
-    
+
     if [ ! -d "$lib_path" ]; then
         # Try alternate location
         lib_path="$HOME/Arduino/libraries/pt100rtd"
     fi
-    
+
     if [ ! -d "$lib_path" ]; then
         echo "  pt100rtd library not found, skipping patch"
         return
     fi
-    
+
     local header="$lib_path/pt100rtd.h"
     if [ ! -f "$header" ]; then
         echo "  pt100rtd.h not found, skipping patch"
         return
     fi
-    
+
     # Check if already patched (look for ESP32-specific include)
     if grep -q "defined(ESP32)" "$header"; then
-        echo -e "  ${GREEN}pt100rtd already patched for ESP32${NC}"
+        echo -e "  ${GREEN}pt100rtd already patched${NC}"
         return
     fi
-    
-    echo "  Applying ESP32 pgmspace.h fix..."
+
+    echo "  Applying cross-platform pgmspace.h fix..."
     # Backup original
     cp "$header" "$header.bak"
-    
-    # The fix: Replace the pgmspace include block with a more comprehensive one
-    # Original typically has: #if defined(__arm__) ... #include <avr/pgmspace.h>
-    # ESP32/ESP8266 need <pgmspace.h> without avr/ prefix
-    
-    # Create the replacement block (ESP32 first, then group all avr/ users)
-    local new_block='#if defined(ESP32) || defined(ESP8266)
-  #include <pgmspace.h>
-#elif defined(__AVR__) || defined(__arm__) || defined(__SAMD21__) || defined(__SAMD51__)
-  #include <avr/pgmspace.h>
-#else
-  #ifndef PROGMEM
-    #define PROGMEM
-  #endif
-  #ifndef pgm_read_word_near
-    #define pgm_read_word_near(addr) (*(const uint16_t *)(addr))
-  #endif
-#endif'
-    
-    # Use awk to replace the pgmspace section
-    awk -v new="$new_block" '
-    /^#if defined\(__arm__\)/ { 
-        in_block = 1
-        print new
-        next
+
+    # Replace the upstream pgmspace block:
+    #   #if (defined(__AVR__))
+    #   #include <avr\pgmspace.h>
+    #   #else
+    #   #include <pgmspace.h>
+    #   #endif
+    # With a comprehensive cross-platform version.
+    awk '
+    /^#if \(defined\(__AVR__\)\)/ {
+        print "#if defined(__AVR__)"
+        print "  #include <avr/pgmspace.h>"
+        print "#elif defined(ESP32) || defined(ESP8266)"
+        print "  #include <pgmspace.h>"
+        print "#elif defined(__arm__) || defined(__SAMD21__) || defined(__SAMD51__)"
+        print "  #include <avr/pgmspace.h>"
+        print "#else"
+        print "  #ifndef PROGMEM"
+        print "    #define PROGMEM"
+        print "  #endif"
+        print "  #ifndef pgm_read_word_near"
+        print "    #define pgm_read_word_near(addr) (*(const uint16_t *)(addr))"
+        print "  #endif"
+        print "#endif"
+        skip=1; next
     }
-    in_block && /^#endif/ {
-        in_block = 0
-        next
-    }
-    in_block { next }
+    skip && /^#endif/ { skip=0; next }
+    skip { next }
     { print }
     ' "$header" > "$header.tmp" && mv "$header.tmp" "$header"
-    
+
     if grep -q "defined(ESP32)" "$header"; then
         echo -e "  ${GREEN}pt100rtd patched successfully${NC}"
         echo "  Backup saved to $header.bak"

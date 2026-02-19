@@ -1485,7 +1485,32 @@ void setup() {
     Serial.print("Connecting to WiFi (");
     Serial.print(useSSID);
     Serial.print(")");
-    WiFi.begin(useSSID, usePass);
+    if (strcmp(useSSID, "ANY") == 0) {
+      // Scan for the strongest open (unencrypted) network and connect
+      Serial.println(" [scanning for open network]");
+      int n = WiFi.scanNetworks();
+      int bestRSSI = -999;
+      String bestSSID = "";
+      for (int i = 0; i < n; i++) {
+        if (WiFi.encryptionType(i) == WIFI_AUTH_OPEN && WiFi.RSSI(i) > bestRSSI) {
+          bestRSSI = WiFi.RSSI(i);
+          bestSSID = WiFi.SSID(i);
+        }
+      }
+      WiFi.scanDelete();
+      if (bestSSID.length() > 0) {
+        Serial.print("Found open network: ");
+        Serial.print(bestSSID);
+        Serial.print(" (RSSI ");
+        Serial.print(bestRSSI);
+        Serial.print(")");
+        WiFi.begin(bestSSID.c_str());
+      } else {
+        Serial.println("No open networks found");
+      }
+    } else {
+      WiFi.begin(useSSID, usePass);
+    }
     int dots = 0;
     int attempts = 0;
     while (WiFi.status() != WL_CONNECTED && attempts < 60) {
@@ -1566,7 +1591,12 @@ void setup() {
     Serial.print("Connecting to WiFi (");
     Serial.print(useSSID);
     Serial.print(")");
-    WiFi.begin(useSSID, usePass);
+    if (strcmp(useSSID, "ANY") == 0) {
+      Serial.print(" [scanning for open network]");
+      WiFi.begin();  // m2m_wifi_default_connect — connects to first open AP
+    } else {
+      WiFi.begin(useSSID, usePass);
+    }
     int dots = 0;
     while (WiFi.status() != WL_CONNECTED) {
       delay(500);
@@ -1592,7 +1622,32 @@ void setup() {
   Serial.print("Connecting to WiFi (");
   Serial.print(useSSID);
   Serial.print(")");
-  WiFi.begin(useSSID, usePass);
+  if (strcmp(useSSID, "ANY") == 0) {
+    // Scan for the strongest open (unencrypted) network and connect
+    Serial.println(" [scanning for open network]");
+    int n = WiFi.scanNetworks();
+    int bestRSSI = -999;
+    String bestSSID = "";
+    for (int i = 0; i < n; i++) {
+      if (WiFi.encryptionType(i) == WIFI_AUTH_OPEN && WiFi.RSSI(i) > bestRSSI) {
+        bestRSSI = WiFi.RSSI(i);
+        bestSSID = WiFi.SSID(i);
+      }
+    }
+    WiFi.scanDelete();
+    if (bestSSID.length() > 0) {
+      Serial.print("Found open network: ");
+      Serial.print(bestSSID);
+      Serial.print(" (RSSI ");
+      Serial.print(bestRSSI);
+      Serial.print(")");
+      WiFi.begin(bestSSID.c_str());
+    } else {
+      Serial.println("No open networks found");
+    }
+  } else {
+    WiFi.begin(useSSID, usePass);
+  }
   int dots = 0;
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
@@ -2317,7 +2372,29 @@ void webserver() {
             delay(100);
             const char* useSSID = (cfgWifiSSID.length() > 0) ? cfgWifiSSID.c_str() : ssid;
             const char* usePass = (cfgWifiPass.length() > 0) ? cfgWifiPass.c_str() : pass;
-            WiFi.begin(useSSID, usePass);
+            if (strcmp(useSSID, "ANY") == 0) {
+              // Scan for the strongest open (unencrypted) network and connect
+              Serial.println("Scanning for open network (SSID=ANY)...");
+              int n = WiFi.scanNetworks();
+              int bestRSSI = -999;
+              String bestSSID = "";
+              for (int i = 0; i < n; i++) {
+                if (WiFi.encryptionType(i) == WIFI_AUTH_OPEN && WiFi.RSSI(i) > bestRSSI) {
+                  bestRSSI = WiFi.RSSI(i);
+                  bestSSID = WiFi.SSID(i);
+                }
+              }
+              WiFi.scanDelete();
+              if (bestSSID.length() > 0) {
+                Serial.print("Found open network: ");
+                Serial.println(bestSSID);
+                WiFi.begin(bestSSID.c_str());
+              } else {
+                Serial.println("No open networks found");
+              }
+            } else {
+              WiFi.begin(useSSID, usePass);
+            }
             if (cfgWifiIP != IPAddress(0, 0, 0, 0)) {
               WiFi.config(cfgWifiIP, cfgWifiGateway, cfgWifiSubnet, cfgWifiDNS);
             }
