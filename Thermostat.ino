@@ -641,11 +641,10 @@ float readBatteryVoltage() {
 #endif
 
 // Send common HTTP response headers
-// Use Print& to allow both EthernetClient and WiFiClient (both inherit from Print)
-void sendJsonHeaders(Print &cl) {
+void sendJsonHeaders(HardwareClient &cl) {
   cl.println(F("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\nConnection: close\r\n"));
 }
-void sendHtmlHeaders(Print &cl) {
+void sendHtmlHeaders(HardwareClient &cl) {
   cl.println(F("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nCache-Control: no-cache, no-store, must-revalidate\r\nPragma: no-cache\r\nExpires: 0\r\nConnection: close\r\n"));
 }
 
@@ -6693,7 +6692,7 @@ bool isPathSafe(const String& path) {
 }
 
 // Helper: JSON-escape a string
-void jsonEscapePrint(Print& out, const String& str) {
+void jsonEscapePrint(HardwareClient& out, const String& str) {
   for (unsigned int i = 0; i < str.length(); i++) {
     char c = str.charAt(i);
     switch (c) {
