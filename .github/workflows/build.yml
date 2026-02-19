@@ -176,6 +176,13 @@ jobs:
             echo "pt100rtd already patched or not found"
           fi
 
+      - name: Rename sketch folder for arduino-cli
+        run: |
+          # arduino-cli requires the sketch folder name to match the .ino filename.
+          # GitHub checks out to ArduinoThermostat/ but the sketch is Thermostat.ino.
+          cd ..
+          cp -a ArduinoThermostat Thermostat
+
       - name: Compile ${{ matrix.output }}
         run: |
           EXTRA=""
@@ -184,10 +191,10 @@ jobs:
           fi
           arduino-cli compile \
             --fqbn "${{ matrix.fqbn }}" \
-            --build-path build \
+            --build-path "${{ github.workspace }}/build" \
             --warnings default \
             $EXTRA \
-            Thermostat.ino
+            ../Thermostat
 
       - name: Collect binary
         run: |
