@@ -46,7 +46,8 @@
 # =============================================================================
 #
 #   arduino-cli lib install "Adafruit MAX31865 library"
-#   arduino-cli lib install "pt100rtd"
+#   git clone https://github.com/drhaney/pt100rtd.git \
+#     "$(arduino-cli config get directories.user)/libraries/pt100rtd"
 #   arduino-cli lib install "Adafruit GFX Library"
 #   arduino-cli lib install "Adafruit ILI9341"
 #   arduino-cli lib install "Adafruit FT6206 Library"
@@ -209,10 +210,9 @@ install_deps() {
         "STMicroelectronics:stm32|STM32 (STM32F405)"
     )
     
-    # Required libraries
+    # Required libraries (pt100rtd is installed separately from GitHub)
     local LIBRARIES=(
         "Adafruit MAX31865 library"
-        "pt100rtd"
         "Adafruit GFX Library"
         "Adafruit ILI9341"
         "Adafruit FT6206 Library"
@@ -323,7 +323,27 @@ install_deps() {
         echo "Skipped."
     fi
     echo ""
-    
+
+    # Step 6: Install pt100rtd from GitHub (not in Arduino Library Manager)
+    echo -e "${YELLOW}Step 6: Install pt100rtd library from GitHub${NC}"
+    local user_dir
+    user_dir=$(arduino-cli config get directories.user 2>/dev/null)
+    local pt100_path="$user_dir/libraries/pt100rtd"
+    if [ -d "$pt100_path" ]; then
+        echo -e "  ${GREEN}✓${NC} pt100rtd already installed at $pt100_path"
+    else
+        read -p "Clone pt100rtd from GitHub? [Y/n] " -n 1 -r
+        echo ""
+        if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+            git clone https://github.com/drhaney/pt100rtd.git "$pt100_path" && \
+                echo -e "  ${GREEN}✓ pt100rtd installed${NC}" || \
+                echo -e "  ${RED}✗ Failed to clone pt100rtd${NC}"
+        else
+            echo "  Skipped."
+        fi
+    fi
+    echo ""
+
     # Done
     echo "=============================================="
     echo -e "${GREEN}Dependency installation complete!${NC}"

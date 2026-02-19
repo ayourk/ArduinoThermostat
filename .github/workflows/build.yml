@@ -147,9 +147,11 @@ jobs:
 
       - name: Install libraries
         run: |
+          # pt100rtd is not in Arduino Library Manager; clone from GitHub
+          git clone https://github.com/drhaney/pt100rtd.git \
+            "$(arduino-cli config get directories.user)/libraries/pt100rtd"
           arduino-cli lib install \
             "Adafruit MAX31865 library" \
-            "pt100rtd" \
             "Adafruit GFX Library" \
             "Adafruit ILI9341" \
             "Adafruit FT6206 Library" \
