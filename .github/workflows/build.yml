@@ -164,14 +164,36 @@ jobs:
             "WiFi101" \
             "ArduinoOTA"
 
-      - name: Patch pt100rtd for ESP32
-        if: startsWith(matrix.core, 'esp32')
+      - name: Patch pt100rtd for cross-platform pgmspace.h
         run: |
           LIB_PATH=$(arduino-cli config get directories.user)/libraries/pt100rtd
           HEADER="$LIB_PATH/pt100rtd.h"
           if [ -f "$HEADER" ] && ! grep -q "defined(ESP32)" "$HEADER"; then
-            sed -i 's/#if defined(__arm__)/#if defined(ESP32) || defined(ESP8266)\n  #include <pgmspace.h>\n#elif defined(__arm__)/' "$HEADER"
-            echo "Patched pt100rtd.h for ESP32"
+            # Upstream has a simplistic AVR-vs-everything pgmspace block.
+            # Replace with comprehensive cross-platform version.
+            awk '
+            /^#if \(defined\(__AVR__\)\)/ {
+              print "#if defined(__AVR__)"
+              print "  #include <avr/pgmspace.h>"
+              print "#elif defined(ESP32) || defined(ESP8266)"
+              print "  #include <pgmspace.h>"
+              print "#elif defined(__arm__) || defined(__SAMD21__) || defined(__SAMD51__)"
+              print "  #include <avr/pgmspace.h>"
+              print "#else"
+              print "  #ifndef PROGMEM"
+              print "    #define PROGMEM"
+              print "  #endif"
+              print "  #ifndef pgm_read_word_near"
+              print "    #define pgm_read_word_near(addr) (*(const uint16_t *)(addr))"
+              print "  #endif"
+              print "#endif"
+              skip=1; next
+            }
+            skip && /^#endif/ { skip=0; next }
+            skip { next }
+            { print }
+            ' "$HEADER" > "$HEADER.tmp" && mv "$HEADER.tmp" "$HEADER"
+            echo "Patched pt100rtd.h for cross-platform support"
           else
             echo "pt100rtd already patched or not found"
           fi
