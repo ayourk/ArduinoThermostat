@@ -30,8 +30,8 @@ canvas{cursor:pointer;}
 </div>
 <div style='text-align:center;margin-top:10px;'>
 <a href='/config' style='color:#4ade80;font-size:12px;'>&#9881; Configuration</a>
- &middot;
-<a href='/sdfiles' style='color:#fbbf24;font-size:12px;'>&#128193; SD Files</a>
+{if $SD_CARD == "1"} &middot;
+<a href='/sdfiles' style='color:#fbbf24;font-size:12px;'>&#128193; SD Files</a>{/if}
  &middot;
 <a href='/update' style='color:#888;font-size:12px;'>&#128295; Firmware Update</a>
 </div>
@@ -66,9 +66,27 @@ ctx.beginPath();ctx.roundRect(170,145,140,90,5);ctx.stroke();
 ctx.fillStyle='#FFFF00';ctx.font='bold 14px sans-serif';ctx.fillText('Light',65,163);ctx.fillText('System',215,163);
 ctx.beginPath();ctx.moveTo(15,170);ctx.lineTo(155,170);ctx.moveTo(170,170);ctx.lineTo(310,170);ctx.stroke();
 if(s.heatEnabled){ctx.fillStyle='#FFFF00';ctx.font='14px sans-serif';ctx.fillText('Heat',225,190);}
+var scr=s.settingsScreen||'off';if(scr!=='off'){var a=(scr==='lan')?'#FF0':'#60a5fa',v=80,y=46,l=16;
+ctx.fillStyle='rgba(0,0,0,.95)';ctx.fillRect(6,3,308,234);ctx.strokeStyle=a;ctx.lineWidth=2;ctx.strokeRect(6,3,308,234);ctx.strokeRect(8,5,304,230);
+ctx.fillStyle=a;ctx.font='bold 14px sans-serif';ctx.fillText('Network Settings',14,22);ctx.font='12px sans-serif';ctx.fillText((scr==='lan')?'Ethernet [1/2]':'WiFi [2/2]',210,20);
+ctx.beginPath();ctx.moveTo(14,28);ctx.lineTo(306,28);ctx.stroke();if(s.network){var net=s.network,n=(net.mode==='dual')?((scr==='lan')?net.ethernet:net.wifi):net;
+if(scr==='lan'){ctx.fillStyle='#fff';ctx.fillText('IP:',14,y);ctx.fillStyle='#0f0';ctx.fillText(n.ip||'-',v,y);y+=l;
+ctx.fillStyle='#fff';ctx.fillText('Subnet:',14,y);ctx.fillStyle='#0f0';ctx.fillText(n.subnet||'-',v,y);y+=l;ctx.fillStyle='#fff';ctx.fillText('Gateway:',14,y);ctx.fillStyle='#0f0';ctx.fillText(n.gateway||'-',v,y);y+=l;
+if(n.dns){ctx.fillStyle='#fff';ctx.fillText('DNS:',14,y);ctx.fillStyle='#0f0';ctx.fillText(n.dns,v,y);y+=l;}ctx.fillStyle='#fff';ctx.fillText('MAC:',14,y);ctx.fillStyle='#0f0';ctx.fillText(n.mac||'-',v,y);y+=l;
+ctx.fillStyle='#fff';ctx.fillText('Link:',14,y);ctx.fillStyle=(n.link==='Connected')?'#0f0':'#f00';ctx.fillText(n.link||'-',v,y);y+=l;}else{
+var c2=165,v2=220;ctx.fillStyle='#aaa';ctx.fillText('SSID:',14,y);ctx.fillStyle='#fff';ctx.fillText(n.ssid||'-',v,y);y+=l;
+ctx.fillStyle='#aaa';ctx.fillText('IP:',14,y);ctx.fillStyle='#fff';ctx.fillText(n.ip||'-',v,y);ctx.fillStyle='#aaa';ctx.fillText('Status:',c2,y);ctx.fillStyle=(n.link==='Connected')?'#0f0':'#f00';ctx.fillText(n.link||'-',v2,y);y+=l;
+ctx.fillStyle='#aaa';ctx.fillText('Subnet:',14,y);ctx.fillStyle='#fff';ctx.fillText(n.subnet||'-',v,y);if(net.battery){var bv=net.battery;ctx.fillStyle='#aaa';ctx.fillText('Battery:',c2,y);ctx.fillStyle=(bv>3.5)?'#0f0':(bv<=3.3)?'#f00':'#ff0';ctx.fillText(bv.toFixed(2)+'V',v2,y);}y+=l;
+ctx.fillStyle='#aaa';ctx.fillText('Gateway:',14,y);ctx.fillStyle='#fff';ctx.fillText(n.gateway||'-',v,y);y+=l;ctx.fillStyle='#aaa';ctx.fillText('MAC:',14,y);ctx.fillStyle='#fff';ctx.fillText(n.mac||'-',v,y);y+=l;
+if(n.security){ctx.fillStyle='#aaa';ctx.fillText('Security:',14,y);ctx.fillStyle='#fff';ctx.fillText(n.security,v,y);}if(n.rssi!=null){ctx.fillStyle='#aaa';ctx.fillText('RSSI:',c2,y);var rs=n.rssi;ctx.fillStyle=(rs>-50)?'#0f0':(rs>-70)?'#ff0':'#f00';ctx.fillText(rs+' dBm',v2,y);}y+=l;}}
+y+=6;ctx.strokeStyle='#444';ctx.beginPath();ctx.moveTo(14,y);ctx.lineTo(306,y);ctx.stroke();y+=14;ctx.fillStyle=a;ctx.font='bold 12px sans-serif';ctx.fillText('Outdoor Unit',14,y);y+=l;ctx.font='12px sans-serif';
+if(s.outdoor&&s.outdoor.configured){var o=s.outdoor;ctx.fillStyle='#fff';ctx.fillText('Remote:',14,y);ctx.fillStyle='#0f0';ctx.fillText(o.ip+':'+o.port,v,y);y+=l;
+ctx.fillStyle='#fff';ctx.fillText('Status:',14,y);ctx.fillStyle=(o.status==='Online')?'#0f0':'#f00';ctx.fillText(o.status,v,y);}else{ctx.fillStyle='#888';ctx.fillText('Not configured',v,y);}
+ctx.fillStyle=a;ctx.font='11px sans-serif';ctx.fillText((scr==='lan')?'Tap for WiFi':'Tap anywhere to close',90,228);}
 }
 function buildCards(s){var h='';
 if(s.environment){var e=s.environment;h+="<div class='card'><div class='label'>ENVIRONMENT ("+e.sensor+")</div>";
+if(s.currentTempRaw!=null)h+="<div class='row'><span>Inside Temp (PT100)</span><span class='value'>"+s.currentTempRaw.toFixed(4)+"&deg;F</span></div>";
 if(e.humidity!=null)h+="<div class='row'><span>Humidity</span><span class='value'>"+e.humidity.toFixed(1)+"%</span></div>";
 if(e.pressInhg!=null)h+="<div class='row'><span>Pressure</span><span class='value'>"+e.pressInhg.toFixed(2)+" inHg</span></div>";
 if(e.gasKohms!=null)h+="<div class='row'><span>Gas</span><span class='value'>"+e.gasKohms.toFixed(1)+" kOhms</span></div>";

@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html><head>
-<title>Thermostat Config - Dual Network</title>
+<title>Thermostat Config{if $HAS_ETHERNET == "1" && $HAS_WIFI == "1"} - Dual Network{elseif $HAS_WIFI == "1"} - WiFi{else} - Ethernet{/if}</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
 body{background:#000;color:#eee;font-family:Arial,sans-serif;margin:0;padding:10px;display:flex;flex-direction:column;align-items:center}
@@ -19,6 +19,7 @@ a{color:#60a5fa}
 .tab{flex:1;padding:8px;text-align:center;cursor:pointer;background:#1a1a1a;border:1px solid #333;border-bottom:none;margin-right:-1px;font-size:.85em;color:#888}
 .tab:first-child{border-radius:4px 0 0 0}.tab:last-child{border-radius:0 4px 0 0;margin-right:0}
 .tab.active{background:#111;color:#4ade80;border-bottom:1px solid #111;margin-bottom:-1px}
+.tab-spacer{flex:1}
 .info-box{background:#1a2a1a;border:1px solid #2a4a2a;border-radius:4px;padding:8px;margin:8px 0;font-size:.8em;color:#6b8}
 .scan-btn{background:#1a3a5c;color:#60a5fa;border:1px solid #60a5fa;border-radius:4px;padding:4px 10px;cursor:pointer;font-size:.78em;margin-left:6px}
 .scan-btn:hover{background:#264a6e}.scan-btn:disabled{opacity:.5;cursor:wait}
@@ -35,18 +36,19 @@ a{color:#60a5fa}
 </head>
 <body>
 
-<!-- Network Configuration Card (Tabbed) -->
+<!-- Network Configuration Card -->
 <div class="card net-border">
 <div class="label net-label">NETWORK CONFIGURATION</div>
 
-<!-- Tab bar -->
+<!-- Tab bar (always present) -->
 <div class="tabs">
-<div class="tab active" id="tabEth" onclick="switchTab('eth')">Ethernet</div>
-<div class="tab" id="tabWifi" onclick="switchTab('wifi')">WiFi</div>
+{if $HAS_ETHERNET == "1"}<div class="tab active" id="tabEth" onclick="switchTab('eth')">Ethernet</div>{else}<div class="tab-spacer"></div>{/if}
+{if $HAS_WIFI == "1"}<div class="tab{if $HAS_ETHERNET != "1"} active{/if}" id="tabWifi" onclick="switchTab('wifi')">WiFi</div>{else}<div class="tab-spacer"></div>{/if}
 </div>
 
 <form id="netForm">
 
+{if $HAS_ETHERNET == "1"}
 <!-- Ethernet Panel -->
 <div id="panelEth">
 <div class="row"><span>IP</span><span class="value">{$ETH_IP}</span></div>
@@ -58,9 +60,11 @@ a{color:#60a5fa}
 <div class="row"><span>Subnet</span><input id="eth_sub" value="{$ETH_CFG_SUBNET}" placeholder="255.255.255.0"></div>
 <div class="row"><span>Gateway</span><input id="eth_gw" value="{$ETH_CFG_GATEWAY}" placeholder="10.1.0.1"></div>
 </div>
+{/if}
 
-<!-- WiFi Panel (hidden by default) -->
-<div id="panelWifi" style="display:none">
+{if $HAS_WIFI == "1"}
+<!-- WiFi Panel -->
+<div id="panelWifi" {if $HAS_ETHERNET == "1"}style="display:none"{/if}>
 <div class="row"><span>SSID</span><span class="value">{$WIFI_SSID}</span></div>
 <div class="row"><span>IP</span><span class="value">{$WIFI_IP}</span></div>
 <div class="row"><span>MAC</span><span class="value">{$WIFI_MAC}</span></div>
@@ -76,9 +80,14 @@ a{color:#60a5fa}
 <div class="row"><span>Subnet</span><input id="wifi_sub" value="{$WIFI_CFG_SUBNET}" placeholder="255.255.255.0"></div>
 <div class="row"><span>Gateway</span><input id="wifi_gw" value="{$WIFI_CFG_GATEWAY}" placeholder="192.168.1.1"></div>
 </div>
+{/if}
 
 <!-- Info box and Save -->
+{if $HAS_ETHERNET == "1" && $HAS_WIFI == "1"}
 <div class="info-box" id="infoBox">&#9432; Connected via Ethernet. WiFi changes apply immediately. Ethernet changes apply from WiFi or restart.</div>
+{else}
+<div class="info-box">&#9432; Changes apply after restart.</div>
+{/if}
 <div style="text-align:center;margin-top:8px">
 <button type="submit" id="saveBtn">Save Network</button>
 </div>
@@ -95,34 +104,67 @@ a{color:#60a5fa}
 <div class="row"><span>Port</span><span class="value">{$OUTDOOR_CFG_PORT}</span></div>
 <div class="row"><span>Poll interval</span><span class="value">{$OUTDOOR_POLL_SECS}s</span></div>
 <div class="row"><span>Status</span><span class="value {if $OUTDOOR_AVAILABLE == "1"}online{elseif $OUTDOOR_STATUS == "Offline"}offline{else}na{/if}">{if $OUTDOOR_CONFIGURED == "1"}{$OUTDOOR_STATUS}{else}Not configured{/if}</span></div>
+{if $OUTDOOR_AVAILABLE == "1"}
+<div class="row"><span>Outdoor Temp</span><span class="value">{$OUTDOOR_TEMP}&deg;F</span></div>
+{if $OUTDOOR_HUMIDITY != ""}<div class="row"><span>Humidity</span><span class="value">{$OUTDOOR_HUMIDITY}%</span></div>{/if}
+{/if}
 </div>
 
 <!-- Configure Outdoor Unit -->
 <div class="card"><div class="label">CONFIGURE OUTDOOR UNIT</div>
-<form id="outForm">
+<form id="outForm" action="/config" method="get">
 <div class="row"><span>Outdoor IP</span><input name="ip" value="{if $OUTDOOR_CONFIGURED == "1"}{$OUTDOOR_CFG_IP}{/if}" placeholder="10.1.0.72"></div>
 <div class="row"><span>Port</span><input name="port" value="{$OUTDOOR_CFG_PORT}" placeholder="80"></div>
 <div class="row"><span>Poll (sec)</span><input name="poll" value="{$OUTDOOR_POLL_SECS}" placeholder="30"></div>
 <div style="text-align:center;margin-top:8px">
-<button type="submit">Save Outdoor</button>
+<button type="submit">Save</button>
 </div>
 </form>
-<form id="clearForm" style="text-align:center;margin-top:4px">
-<button type="submit" style="background:#3a1a1a;border-color:#5a2a2a;color:#f87171">Clear Outdoor</button>
+{if $OUTDOOR_CONFIGURED == "1"}
+<form id="clearForm" action="/config" method="get" style="text-align:center;margin-top:4px">
+<input type="hidden" name="clear" value="1">
+<button type="submit" style="color:#f87171">Clear Outdoor Config</button>
 </form>
+{/if}
 </div>
 
-<!-- Back link -->
-<div style="margin-top:12px"><a href="/">← Back to Thermostat</a></div>
+<!-- Endpoints -->
+<div class="card">
+<div class="label">ENDPOINTS</div>
+<div class="row"><a href="/">Home</a></div>
+{if $SD_CARD == "1"}<div class="row"><a href="/sdfiles">/sdfiles</a> -- SD card file manager</div>{/if}
+<div class="row"><a href="/outdoorjson">/outdoorjson</a> -- this unit as outdoor</div>
+<div class="row"><a href="/indoorjson">/indoorjson</a> -- this unit as indoor</div>
+<div class="row"><a href="/api/state">/api/state</a> -- JSON state</div>
+<div class="row"><a href="/config">/config</a> -- this page</div>
+{if $HAS_WIFI == "1"}<div class="row"><a href="/api/scan">/api/scan</a> -- WiFi scan (JSON)</div>{/if}
+</div>
+
+{if $SD_CARD != "1"}
+<p style="color:#f87171;font-size:.8em;text-align:center">&#9888; No SD card -- settings won't persist across reboot.</p>
+{/if}
+
+<p><a href="/">&larr; Back to thermostat</a></p>
 
 {literal}<script>
-// Tab switching (simple display toggle)
+// Detect available interfaces from template variables
+var hasEth = '{$HAS_ETHERNET}' === '1';
+var hasWifi = '{$HAS_WIFI}' === '1';
+var isDual = hasEth && hasWifi;
+
+// Tab switching
 function switchTab(t) {
-  document.getElementById('panelEth').style.display = (t==='eth') ? 'block' : 'none';
-  document.getElementById('panelWifi').style.display = (t==='wifi') ? 'block' : 'none';
-  document.getElementById('tabEth').classList.toggle('active', t==='eth');
-  document.getElementById('tabWifi').classList.toggle('active', t==='wifi');
-  document.getElementById('infoBox').innerHTML = (t==='eth')
+  if (!isDual) return;
+  var pe = document.getElementById('panelEth');
+  var pw = document.getElementById('panelWifi');
+  var te = document.getElementById('tabEth');
+  var tw = document.getElementById('tabWifi');
+  var ib = document.getElementById('infoBox');
+  if (pe) pe.style.display = (t==='eth') ? 'block' : 'none';
+  if (pw) pw.style.display = (t==='wifi') ? 'block' : 'none';
+  if (te) te.classList.toggle('active', t==='eth');
+  if (tw) tw.classList.toggle('active', t==='wifi');
+  if (ib) ib.innerHTML = (t==='eth')
     ? '&#9432; Connected via Ethernet. WiFi changes apply immediately. Ethernet changes apply from WiFi or restart.'
     : '&#9432; Connected via WiFi. Ethernet changes apply immediately. WiFi changes apply from Ethernet or restart.';
 }
@@ -137,21 +179,37 @@ function apiPost(data, btn) {
   }).catch(() => { btn.textContent = 'Error'; btn.disabled = false; });
 }
 
-// Network form submit
+// Network form submit — adapts action and keys to build type
 document.getElementById('netForm').addEventListener('submit', function(e) {
   e.preventDefault();
-  var d = {action: 'dual_network',
-    eth_cfg_ip: document.getElementById('eth_sip').value,
-    eth_cfg_dns: document.getElementById('eth_dns').value,
-    eth_cfg_subnet: document.getElementById('eth_sub').value,
-    eth_cfg_gateway: document.getElementById('eth_gw').value,
-    wifi_ssid: document.getElementById('wifi_ssid').value,
-    wifi_pass: document.getElementById('wifi_pass').value,
-    wifi_cfg_ip: document.getElementById('wifi_sip').value,
-    wifi_cfg_dns: document.getElementById('wifi_dns').value,
-    wifi_cfg_subnet: document.getElementById('wifi_sub').value,
-    wifi_cfg_gateway: document.getElementById('wifi_gw').value
-  };
+  var d = {};
+  if (isDual) {
+    d.action = 'dual_network';
+    d.eth_cfg_ip = document.getElementById('eth_sip').value;
+    d.eth_cfg_dns = document.getElementById('eth_dns').value;
+    d.eth_cfg_subnet = document.getElementById('eth_sub').value;
+    d.eth_cfg_gateway = document.getElementById('eth_gw').value;
+    d.wifi_ssid = document.getElementById('wifi_ssid').value;
+    d.wifi_pass = document.getElementById('wifi_pass').value;
+    d.wifi_cfg_ip = document.getElementById('wifi_sip').value;
+    d.wifi_cfg_dns = document.getElementById('wifi_dns').value;
+    d.wifi_cfg_subnet = document.getElementById('wifi_sub').value;
+    d.wifi_cfg_gateway = document.getElementById('wifi_gw').value;
+  } else if (hasWifi) {
+    d.action = 'network';
+    d.wifi_ssid = document.getElementById('wifi_ssid').value;
+    d.wifi_pass = document.getElementById('wifi_pass').value;
+    d.wifi_cfg_ip = document.getElementById('wifi_sip').value;
+    d.wifi_cfg_dns = document.getElementById('wifi_dns').value;
+    d.wifi_cfg_subnet = document.getElementById('wifi_sub').value;
+    d.wifi_cfg_gateway = document.getElementById('wifi_gw').value;
+  } else if (hasEth) {
+    d.action = 'network';
+    d.eth_cfg_ip = document.getElementById('eth_sip').value;
+    d.eth_cfg_dns = document.getElementById('eth_dns').value;
+    d.eth_cfg_subnet = document.getElementById('eth_sub').value;
+    d.eth_cfg_gateway = document.getElementById('eth_gw').value;
+  }
   apiPost(d, document.getElementById('saveBtn'));
 });
 
@@ -168,7 +226,7 @@ document.getElementById('clearForm').addEventListener('submit', function(e) {
   apiPost({action:'clear_outdoor'}, e.target.querySelector('button[type=submit]'));
 });
 
-// WiFi scan
+// WiFi scan (only available when hasWifi)
 function doScan() {
   var btn = document.getElementById('scanBtn'), list = document.getElementById('scanList');
   btn.disabled = true; btn.textContent = 'Scanning...';

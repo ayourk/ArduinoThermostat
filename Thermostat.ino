@@ -3006,7 +3006,7 @@ bool resolveVar(const String &varName, String &value) {
     value = String(buf);
   }
   else if (varName == "TARGET_TEMP")       value = String(targIndoorTemp);
-  else if (varName == "CURRENT_TEMP_RAW")  value = String(curIndoorTemp, 1);
+  else if (varName == "CURRENT_TEMP_RAW")  value = String(curIndoorTemp, 4);
   else if (varName == "TEMP_COLOR")        value = tempColorCSS();
   else if (varName == "HEAT_ENABLED")      value = isHeatOn ? "1" : "0";
   else if (varName == "HEAT_ACTIVE")       value = isCurHeatOn ? "1" : "0";
@@ -3909,6 +3909,7 @@ void generateIndexHtml() {
   f.println("function buildCards(s){var h='';");
   // ENVIRONMENT card
   f.println("if(s.environment){var e=s.environment;h+=\"<div class='card'><div class='label'>ENVIRONMENT (\"+e.sensor+\")</div>\";");
+  f.println("if(s.currentTempRaw!=null)h+=\"<div class='row'><span>Inside Temp (PT100)</span><span class='value'>\"+s.currentTempRaw.toFixed(4)+\"&deg;F</span></div>\";");
   f.println("if(e.humidity!=null)h+=\"<div class='row'><span>Humidity</span><span class='value'>\"+e.humidity.toFixed(1)+\"%</span></div>\";");
   f.println("if(e.pressInhg!=null)h+=\"<div class='row'><span>Pressure</span><span class='value'>\"+e.pressInhg.toFixed(2)+\" inHg</span></div>\";");
   f.println("if(e.gasKohms!=null)h+=\"<div class='row'><span>Gas</span><span class='value'>\"+e.gasKohms.toFixed(1)+\" kOhms</span></div>\";");

@@ -104,13 +104,13 @@ For extreme cold environments (below -20°C / -4°F):
 - Use headless mode (no TFT display) or accept display limitations
 - BME sensor accuracy will degrade; PT100 remains accurate
 - Use industrial-rated microSD cards (Kingston SDCIT series recommended)
-- The firmware automatically disables BME below -30°F to prevent damage
+- The firmware automatically disables BME below -30°F to mitigate damage
 
 
 ## GPIO Current Limits and BME Power Control
 
 For outdoor units in extreme cold, the BME280/BME680 should be powered down
-when temperature drops below -40°C to prevent sensor damage. This can be done
+when temperature drops below -40°C to mitigate sensor damage. This can be done
 by powering the sensor from a GPIO pin (simplest) or using a MOSFET switch.
 
 The firmware automatically handles power control when BME_POWER_PIN is set
@@ -260,6 +260,28 @@ use a standard ESP32-S2 Feather (#5000) with a separate BME280 breakout
   -- or BME280 breakout   Adafruit          #2652 (optional)
   Power Relay FeatherWing Adafruit          #3191 (optional)
 
+GPIO Usage for Option A:
+
+  Function          GPIO    Notes
+  ----------------  ------  -------------------------------------------
+  SPI SCK           SCK     Shared bus (W5500, TFT, SD, MAX31865)
+  SPI MOSI          MOSI    Shared bus
+  SPI MISO          MISO    Shared bus
+  W5500 CS          10      PoE FeatherWing (standard Feather CS)
+  TFT CS            6       ILI9341 TFT display
+  SD Card CS        5       SD card reader
+  MAX31865 CS       12      PT100 RTD amplifier
+  TFT DC            9       ILI9341 data/command select
+  I2C SDA           SDA     BME280/BME680 (addr 0x77/0x76)
+  I2C SCL           SCL     BME280/BME680
+  Relay             13      Power Relay FeatherWing (configurable)
+  BME Power         A1      Optional, for cold-climate power control
+  SD Card Detect    A0      Hot-swap detect (default; -1 to disable)
+
+All SPI devices share the bus with unique chip select pins. The M4 and
+RP2040 use board-standard SPI/I2C pins (no pin numbers needed -- the
+Feather pinout is consistent across variants).
+
 ### Option B: WiFi with Feather M0 WiFi
 
   Component               Source            Product
@@ -272,6 +294,32 @@ use a standard ESP32-S2 Feather (#5000) with a separate BME280 breakout
   BME680 breakout         Adafruit          #3660 (optional)
   -- or BME280 breakout   Adafruit          #2652 (optional)
   Power Relay FeatherWing Adafruit          #3191 (optional)
+
+GPIO Usage for Option B:
+
+  Function          GPIO    Notes
+  ----------------  ------  -------------------------------------------
+  SPI SCK           SCK     Shared bus (TFT, SD, MAX31865)
+  SPI MOSI          MOSI    Shared bus
+  SPI MISO          MISO    Shared bus
+  TFT CS            6       ILI9341 TFT display
+  SD Card CS        5       SD card reader
+  MAX31865 CS       12      PT100 RTD amplifier
+  TFT DC            9       ILI9341 data/command select
+  WINC1500 CS       8       Built-in (Feather M0 WiFi)
+  WINC1500 IRQ      7       Built-in (Feather M0 WiFi)
+  WINC1500 RST      4       Built-in (Feather M0 WiFi)
+  WINC1500 EN       2       Built-in (Feather M0 WiFi)
+  I2C SDA           SDA     BME280/BME680 (addr 0x77/0x76)
+  I2C SCL           SCL     BME280/BME680
+  Relay             13      Power Relay FeatherWing (configurable)
+  Battery           A7      LiPoly voltage divider (built-in)
+  BME Power         A1      Optional, for cold-climate power control
+  SD Card Detect    A0      Hot-swap detect (default; -1 to disable)
+
+The WINC1500 WiFi module is built into the Feather M0 WiFi board.
+Its SPI pins (CS/IRQ/RST/EN) are fixed at the hardware level and
+do not conflict with the ILI9341 TFT, SD card reader, or PT100 amplifier.
 
 ### Option C: WiFi with ESP32-S2 (includes BME280!)
 
@@ -294,12 +342,35 @@ standard ESP32-S2 Feather (#5000) with a separate BME280 breakout (#2652)
 wired to GPIO A1 for power control. See "GPIO Current Limits and BME Power
 Control" section for wiring details.
 
+GPIO Usage for Option C:
+
+  Function          GPIO    Notes
+  ----------------  ------  -------------------------------------------
+  SPI SCK           36      Shared bus (TFT, SD, MAX31865)
+  SPI MOSI          35      Shared bus
+  SPI MISO          37      Shared bus
+  TFT CS            6       ILI9341 TFT display
+  SD Card CS        5       SD card reader
+  MAX31865 CS       12      PT100 RTD amplifier
+  TFT DC            9       ILI9341 data/command select
+  I2C SDA           3       BME280 (built-in on #5303, addr 0x77)
+  I2C SCL           4       BME280 (built-in on #5303)
+  I2C Power         7       PIN_I2C_POWER (ESP32-S2, built-in)
+  Relay             13      Power Relay FeatherWing (configurable)
+  Battery           A2      LiPoly voltage divider (built-in)
+  BME Power         A1      Only for #5000 + external BME280
+  SD Card Detect    A0      Hot-swap detect (default; -1 to disable)
+
+WiFi is handled internally by the ESP32-S2 radio -- no external
+GPIO pins are used for WiFi. PIN_I2C_POWER (GPIO 7) controls the
+on-board I2C power rail, which powers the built-in BME280 on #5303.
+
 ### Option D: PoE Ethernet with ESP32-S2+BME280 (single-cable install)
 
   Component               Source            Product
   ----------------------  ----------------  ----------------------------------
   ESP32-S2 + BME280       Adafruit          #5303 (BME280 built-in)
-  PoE FeatherWing         Adafruit          #5765
+  PoE-FeatherWing         Tindie            silicognition/poe-featherwing
   eyeSPI breakout FW      Custom PCB        github.com/ayourk/eyeSPI-FeatherWing-PCB
   2.8" TFT EYESPI         Adafruit          #2090
   PT100 RTD sensor        Adafruit          #3290
@@ -325,17 +396,20 @@ GPIO Usage for Option D (no conflicts):
   SPI MOSI          35      Shared bus
   SPI MISO          37      Shared bus
   W5500 CS          10      PoE FeatherWing (standard Feather CS)
-  TFT CS            6       eyeSPI breakout
-  SD Card CS        5       eyeSPI breakout
-  MAX31865 CS       12      RTD amplifier
-  TFT DC            9       eyeSPI breakout
+  TFT CS            6       ILI9341 TFT display
+  SD Card CS        5       SD card reader
+  MAX31865 CS       12      PT100 RTD amplifier
+  TFT DC            9       ILI9341 data/command select
   I2C SDA           3       BME280 (built-in, addr 0x77)
   I2C SCL           4       BME280 (built-in)
+  I2C Power         7       PIN_I2C_POWER (ESP32-S2, built-in)
   Relay             13      Power Relay FeatherWing (configurable)
-  SD Card Detect    -1      Optional, use A0-A5 if needed
+  BME Power         A1      Only for #5000 + external BME280
+  SD Card Detect    A0      Hot-swap detect (default; -1 to disable)
 
 All SPI devices share the bus with unique chip select pins. The ESP32-S2
-supports pin multiplexing, so no hardware conflicts exist.
+supports pin multiplexing, so no hardware conflicts exist. WiFi is
+disabled in this configuration (W5500 Ethernet only).
 
 
 ### Option D+: Dual Network (PoE + WiFi simultaneously)
@@ -361,20 +435,26 @@ network changes accordingly:
 - Save from WiFi → Ethernet changes apply immediately
 - Restart applies all pending changes
 
+GPIO Usage for Option D+:
+
+Same hardware as Option D; GPIO assignments are identical (see Option D
+table above). DUAL_NETWORK does not require additional GPIO pins — WiFi
+is handled internally by the ESP32-S2 radio.
+
 
 ### Option E: Extreme Cold Outdoor Unit (with BME power control)
 
 For outdoor units in extreme cold climates (below -30°F / -34°C), use a
 standard Feather (without integrated BME) plus a separate BME280 breakout
 with GPIO power control. This allows the firmware to power-cycle the BME
-sensor to protect it from damage in extreme cold.
+sensor to mitigate damage in extreme cold.
 
   Component               Source            Product
   ----------------------  ----------------  ----------------------------------
   Feather M4 Express      Adafruit          #3857 (or other non-BME Feather)
   -- or ESP32-S2 Feather  Adafruit          #5000 (without BME280)
   -- or ESP32-S3 Feather  Adafruit          #5477
-  PoE FeatherWing         Adafruit          #5765 (or Tindie for M4/RP2040)
+  PoE-FeatherWing         Tindie            silicognition/poe-featherwing
   BME280 breakout         Adafruit          #2652 (separate, with power control)
   eyeSPI breakout FW      Custom PCB        github.com/ayourk/eyeSPI-FeatherWing-PCB
   2.8" TFT EYESPI         Adafruit          #2090
@@ -393,6 +473,32 @@ and automatically powers down the BME280 when temperature drops below -30°F
 
 See "GPIO Current Limits and BME Power Control" section for wiring details
 and board compatibility.
+
+GPIO Usage for Option E:
+
+SPI and I2C pin numbers depend on the base Feather board: use Option A
+pin numbers for M4/RP2040, or Option C/D numbers for ESP32-S2/S3.
+Application-specific pins are consistent across all supported bases:
+
+  Function          GPIO    Notes
+  ----------------  ------  -------------------------------------------
+  SPI SCK           *       SCK (M4/RP2040) or 36 (ESP32-S2/S3)
+  SPI MOSI          *       MOSI (M4/RP2040) or 35 (ESP32-S2/S3)
+  SPI MISO          *       MISO (M4/RP2040) or 37 (ESP32-S2/S3)
+  W5500 CS          10      PoE FeatherWing (standard Feather CS)
+  TFT CS            6       ILI9341 TFT display
+  SD Card CS        5       SD card reader
+  MAX31865 CS       12      PT100 RTD amplifier
+  TFT DC            9       ILI9341 data/command select
+  I2C SDA           *       SDA (M4/RP2040) or 3 (ESP32-S2/S3)
+  I2C SCL           *       SCL (M4/RP2040) or 4 (ESP32-S2/S3)
+  Relay             13      Power Relay FeatherWing (configurable)
+  BME Power         A1      REQUIRED — external BME280 power control
+  SD Card Detect    A0      Hot-swap detect (default; -1 to disable)
+
+The critical difference from all other options: BME_POWER_PIN must be
+set to A1 in firmware (default is -1/disabled). Without it the BME280
+may be damaged at temperatures below -30°F (-34°C).
 
 
 ## DUAL_NETWORK Mode
@@ -1253,8 +1359,8 @@ firmware serves a built-in single-page application with:
   - Interactive canvas: click/touch regions mapped to thermostat controls
     (see Touch Zones above)
   - Environment cards: dynamically built from /api/state JSON data showing
-    indoor BME sensor readings, network info, uptime, and outdoor unit
-    status when configured
+    PT100 inside temp (4 decimal places), indoor BME sensor readings,
+    network info, uptime, and outdoor unit status when configured
   - Connection status indicator: green dot (connected), yellow (retrying),
     red (disconnected after 3 consecutive failures)
   - Initial state seed: server-side values are baked into the page on load
@@ -1605,7 +1711,7 @@ are served via /indoorjson with INDOOR_* prefixed keys.
   -----------------------  -------------  ---------------------------------
   CURRENT_TEMP             72             Indoor temp, rounded integer
   TARGET_TEMP              71             Heating setpoint integer
-  CURRENT_TEMP_RAW         72.3           Indoor temp with one decimal
+  CURRENT_TEMP_RAW         72.3456        Indoor temp with 4 decimals
   TEMP_COLOR               #00FF00        CSS hex color for temp display
                                           (see Temperature Display Colors)
   HEAT_ENABLED             1              "1" if heating mode on, "0" off
@@ -1803,57 +1909,60 @@ that does not match an explicit route is looked up as a file on the
 SD card root. HTML files are processed through the template engine,
 so template variables and {foreach} loops work in any filename.
 
-  File               Variant      Purpose
-  -----------------  -----------  ----------------------------------
-  config-wifi.html   WINC1500     Config page with WiFi scan, forms
-  config-eth.html    W5500        Config page with Ethernet status
-  config-dual.html   DUAL_NETWORK Config page with tabbed Eth/WiFi
-  update-wifi.html   WINC1500     OTA update page with WiFi status
-  update-eth.html    W5500        OTA update page with link status
-  update-dual.html   DUAL_NETWORK OTA update page (use Ethernet!)
+  File                 Purpose
+  -------------------  ------------------------------------------
+  config-sample.html   Network config page (adapts to build type)
+  update-sample.html   OTA firmware update page
+  index-sample.html    Dashboard / status page
+  sdfile-sample.html   SD card file manager
 
-The config templates mirror all cards from the built-in /config page:
+Each template uses Smarty conditionals ({$HAS_ETHERNET}, {$HAS_WIFI})
+to adapt its layout to the compiled build configuration. A single
+template works across WiFi-only, Ethernet-only, and Dual Network
+builds without modification.
+
+The config template mirrors all cards from the built-in /config page:
 network status (read-only), network settings (editable form), outdoor
-unit status, outdoor configuration form, clear button, and endpoint
-links. The WiFi variant includes a Scan button calling /api/scan and
-server-side scan results via {foreach $WIFI_NETWORKS as $net}. The
-Dual Network variant uses a tabbed interface to show both Ethernet
-and WiFi panels. All config forms submit via fetch() POST to
-/api/config (JavaScript in {literal} blocks) with GET query-string
-fallback for noscript.
+unit status (with outdoor temp/humidity when online), outdoor
+configuration form, conditional clear button, SD card warning,
+and endpoint links. For WiFi builds it includes a Scan button
+calling /api/scan via JavaScript fetch(). For Dual Network builds
+a tabbed interface shows both Ethernet and WiFi panels. The config
+form submits via fetch() POST to /api/config (JavaScript in {literal}
+blocks) with GET query-string fallback for noscript.
 
-The update templates mirror the built-in /update page: file selector,
-progress bar, and XHR upload to POST /api/update. Each variant adds a
-small status bar showing the relevant network info (WiFi SSID/RSSI or
-Ethernet IP/link state).
+The update template mirrors the built-in /update page: file selector,
+progress bar, and XHR upload to POST /api/update. It shows the
+relevant network info (WiFi SSID/RSSI or Ethernet IP/link state)
+based on {$CLIENT_INTERFACE}.
 
 **Note:** For Dual Network boards, firmware updates should be performed
 via the Ethernet interface whenever possible. WiFi connections may drop
-during the upload, corrupting the update. The update-dual.html template
-displays a warning when accessed via WiFi.
+during the upload, corrupting the update. The update template displays
+a warning when accessed via WiFi.
 
 Common template variables: {$BOARD}, {$UPTIME_TEXT}, {$SD_CARD},
 {$OTA_SUPPORTED}, {$OUTDOOR_CONFIGURED}, {$OUTDOOR_CFG_IP},
 {$OUTDOOR_CFG_PORT}, {$OUTDOOR_POLL_SECS}, {$OUTDOOR_STATUS},
 {$OUTDOOR_AVAILABLE}, {$OUTDOOR_TEMP}, {$OUTDOOR_HUMIDITY}.
 
-Ethernet templates use: {$ETH_IP}, {$ETH_MAC}, {$ETH_SUBNET},
+Ethernet variables: {$ETH_IP}, {$ETH_MAC}, {$ETH_SUBNET},
 {$ETH_GATEWAY}, {$ETH_LINK}, {$ETH_CFG_IP}, etc.
 
-WiFi templates use: {$WIFI_IP}, {$WIFI_MAC}, {$WIFI_SSID},
+WiFi variables: {$WIFI_IP}, {$WIFI_MAC}, {$WIFI_SSID},
 {$WIFI_RSSI}, {$WIFI_SECURITY}, {$WIFI_CFG_IP}, etc.,
 {$BATVOLTS} (M0 WiFi only).
 
-All templates can use: {$HAS_ETHERNET}, {$HAS_WIFI}, {$IS_DUAL_NETWORK},
+Build detection: {$HAS_ETHERNET}, {$HAS_WIFI}, {$IS_DUAL_NETWORK},
 {$NETWORK_MODE}, {$CLIENT_INTERFACE}, {$CLIENT_IS_ETH}, {$CLIENT_IS_WIFI}.
 
-To use: copy the appropriate variant to the SD card root and link
-to it from a customized index.html (e.g. <a href="/config-wifi.html">
-or <a href="/update-wifi.html">). The SD catchall route serves these
+To use: copy the desired template(s) to the SD card root and link
+to them from a customized index.html (e.g. <a href="/config-sample.html">
+or <a href="/update-sample.html">). The SD catchall route serves these
 files directly by filename. The firmware's built-in /config and
 /update routes always serve the embedded pages regardless of what
 is on the SD card -- the SD templates are reached via their full
-filename (e.g. /config-wifi.html), not via /config.
+filename (e.g. /config-sample.html), not via /config.
 
 
 ## SD Card Configuration (device.cfg)
@@ -2560,9 +2669,9 @@ firmware looks for a 404.html on the SD card and serves it as the
 error page (template-processed, so Smarty variables work). If no
 404.html exists either, the firmware's built-in error page is shown.
 
-This is how the SD card config and update templates (config-wifi.html,
-config-eth.html, update-wifi.html, update-eth.html) are served. Place
-them on the SD card and link from a customized index.html.
+This is how the SD card templates (config-sample.html,
+update-sample.html, etc.) are served. Place them on the SD card
+and link from a customized index.html.
 
 See also: SD Card Favicon (under Fallback Page).
 

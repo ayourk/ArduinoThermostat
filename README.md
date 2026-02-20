@@ -13,7 +13,7 @@ A smart thermostat with indoor/outdoor temperature monitoring, humidity, baromet
 - **Indoor Temperature Control**: Standard thermostat functionality with heat/cool control
 - **Outdoor Weather Station**: PT100 + BME280/BME680 sensor combination
 - **Web Interface**: Remote monitoring with real-time HTML5 Canvas display
-- **Extreme Cold Protection**: Automatic BME280 power management below -30°F
+- **Extreme Cold Mitigation**: Automatic BME280 power cycling below -30°F to reduce sensor damage risk
 - **Touch Screen Display**: ILI9341 TFT with capacitive touch (FT6206/CST826)
 - **Dual Network Support**: Simultaneous Ethernet (PoE) and WiFi on ESP32 boards
 - **Relay Control**: Optional heating/cooling equipment control via relay FeatherWing
@@ -167,14 +167,33 @@ For outdoor use, print the enclosure in **ASA filament**:
 | File | Description |
 |------|-------------|
 | `Thermostat.ino` | Main thermostat firmware |
-| `build-all.sh` | Multi-board build script |
 | `arduino_secrets.h` | WiFi/network credentials template |
+| `favicon_ico.h` | Embedded favicon for web interface |
+| `build-all.sh` | Multi-board build script |
+| `platformio.ini` | PlatformIO build configuration |
+
+### SD Card Templates
+
+| File | Description |
+|------|-------------|
+| `config-sample.html` | Network configuration page (adapts to build type) |
+| `index-sample.html` | Dashboard / status page |
+| `update-sample.html` | OTA firmware update page |
+| `sdfile-sample.html` | SD card file manager |
+| `sample_reference.html` | Developer reference for canvas layout |
+
+### Font / Display
+
+| File | Description |
+|------|-------------|
 | `LCD7segment48pt7b.h` | Custom 7-segment LCD font (48pt) |
 | `LCD7segment72pt7b.h` | Custom 7-segment LCD font (72pt) |
-| `favicon_ico.h` | Embedded favicon for web interface |
+| `LCD7Segment.sfd` | FontForge source for 72pt font |
+| `LCD7Segment48.sfd` | FontForge source for 48pt font |
+| `lcd_7segment_font.svg` | Source vector glyphs for fonts |
 | `font_generator.html` | Browser-based LCD font generator tool |
 | `generate_font.js` | Font generator JavaScript |
-| `lcd_7segment_font.svg` | Source vector glyphs for fonts |
+| `lcd_font_test.html` | Font rendering test page |
 
 ### Documentation
 
@@ -185,8 +204,8 @@ For outdoor use, print the enclosure in **ASA filament**:
 | `SD-README.txt` | SD card template file documentation |
 | `Temperature_Sensor_Comparison.txt` | Comprehensive sensor selection guide |
 | `Thermostat_FeatherWing_Design.txt` | Custom FeatherWing PCB design notes |
-| `thermostat_wiring.svg` | Hardware wiring diagram |
-| `thermostat_eyespi_bridge_map.svg` | Solder bridge configuration guide |
+| `Relay-Feather-labeled.xpm` | Relay board pin diagram |
+| `thermostat_eyespi_bridge_map.xpm` | Solder bridge configuration guide |
 
 ## Hardware Notes
 
