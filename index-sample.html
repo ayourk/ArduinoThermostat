@@ -84,9 +84,13 @@ if(s.outdoor&&s.outdoor.configured){var o=s.outdoor;ctx.fillStyle='#fff';ctx.fil
 ctx.fillStyle='#fff';ctx.fillText('Status:',14,y);ctx.fillStyle=(o.status==='Online')?'#0f0':'#f00';ctx.fillText(o.status,v,y);}else{ctx.fillStyle='#888';ctx.fillText('Not configured',v,y);}
 ctx.fillStyle=a;ctx.font='11px sans-serif';ctx.fillText((scr==='lan')?'Tap for WiFi':'Tap anywhere to close',90,228);}
 }
+function fT(v,d){return +v.toFixed(d);}
 function buildCards(s){var h='';
-if(s.environment){var e=s.environment;h+="<div class='card'><div class='label'>ENVIRONMENT ("+e.sensor+")</div>";
-if(s.currentTempRaw!=null)h+="<div class='row'><span>Inside Temp (PT100)</span><span class='value'>"+s.currentTempRaw.toFixed(4)+"&deg;F</span></div>";
+var e=s.environment||{};h+="<div class='card'><div class='label'>ENVIRONMENT";
+if(e.sensor&&e.sensor!='off')h+="  ("+e.sensor+")";
+h+="</div>";
+if(s.pt100Present&&s.currentTempRaw!=null)h+="<div class='row'><span>Temperature (PT100)</span><span class='value'>"+fT(s.currentTempRaw,4)+"&deg;F</span></div>";
+if(e.temp!=null)h+="<div class='row'><span>Temperature ("+e.sensor+")</span><span class='value'>"+fT(e.temp,1)+"&deg;F</span></div>";
 if(e.humidity!=null)h+="<div class='row'><span>Humidity</span><span class='value'>"+e.humidity.toFixed(1)+"%</span></div>";
 if(e.pressInhg!=null)h+="<div class='row'><span>Pressure</span><span class='value'>"+e.pressInhg.toFixed(2)+" inHg</span></div>";
 if(e.gasKohms!=null)h+="<div class='row'><span>Gas</span><span class='value'>"+e.gasKohms.toFixed(1)+" kOhms</span></div>";
@@ -94,7 +98,7 @@ if(e.dewPoint!=null)h+="<div class='row'><span>Dew Point</span><span class='valu
 if(e.pressureTrend){var tc=(e.pressureTrend.indexOf('Rising')>=0)?'#22c55e':(e.pressureTrend.indexOf('Falling')>=0)?'#ef4444':'#eab308';
 h+="<div class='row'><span>Trend</span><span class='value' style='color:"+tc+"'>"+e.pressureTrend+"</span></div>";}
 if(e.weatherPrediction)h+="<div class='row'><span>Forecast</span><span class='value'>"+e.weatherPrediction+"</span></div>";
-h+="</div>";}
+h+="</div>";
 h+="<div class='card'><div class='label'>SYSTEM</div>";
 if(s.board)h+="<div class='row'><span>Board</span><span class='value'>"+s.board+"</span></div>";
 if(s.network){var n=s.network;

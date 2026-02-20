@@ -750,7 +750,7 @@ Adafruit_BME680 bme680;  // I2C
 #endif
 // SdFat check - look for SDFAT_FILE_TYPE which is defined in SdFatConfig.h
 #if !defined(SDFAT_FILE_TYPE)
-  #error "Missing or outdated library: SdFat 2.x required -- Install 'SdFat' by Bill Greiman via Library Manager"
+  #error "Missing or outdated library: SdFat 2.x required -- Install 'SdFat - Adafruit Fork' by Adafruit via Library Manager"
 #endif
 // BME280 check - library uses __BME280_H__
 #if !defined(__BME280_H__)
@@ -1040,6 +1040,7 @@ const unsigned long userDebounce   = 5UL * 1000UL;          // 5s after user adj
 const unsigned long minRunTime     = 3UL * 60UL * 1000UL;   // min ON  time (3 min, auto)
 const unsigned long minOffTime     = 3UL * 60UL * 1000UL;   // min OFF time (3 min, auto)
 double curIndoorTemp = 71.0;
+bool pt100Present = true;    // cleared on open-circuit fault, set on good read
 int curIndoorTempOld = 71;
 int targIndoorTemp = 71;
 int targIndoorTempOld = 71;
@@ -1735,9 +1736,13 @@ void loop() {
       if (fault & MAX31865_FAULT_REFINHIGH)   Serial.println("REFIN- < 0.85 x Bias - FORCE- open");
       if (fault & MAX31865_FAULT_RTDINLOW)    Serial.println("RTDIN- < 0.85 x Bias - FORCE- open");
       if (fault & MAX31865_FAULT_OVUV)        Serial.println("Under/Over voltage");
+      // Open-circuit faults indicate no PT100 connected
+      if (fault & (MAX31865_FAULT_RTDINLOW | MAX31865_FAULT_REFINHIGH)) pt100Present = false;
       thermo.clearFault();
       Serial.print("Temperature = "); Serial.println(curIndoorTemp);
       Serial.println();
+    } else {
+      pt100Present = true;
     }
 
     // --- BME environmental reading (if detected) ---
@@ -1778,12 +1783,10 @@ void loop() {
       if (!bme680.performReading()) {
         Serial.println("Failed to perform BME680/688 reading :(");
       } else {
-        // BME can override PT100 temp if desired, or just provide env data
-        // curIndoorTemp = (bme680.temperature * 9.0 / 5.0) + 32.0;
+        if (!pt100Present) curIndoorTemp = C2F(bme680.temperature);
       }
     } else if (bmePoweredOn && bme280Present) {
-      // BME280 reads directly, no performReading() needed
-      // curIndoorTemp = (bme280.readTemperature() * 9.0 / 5.0) + 32.0;
+      if (!pt100Present) curIndoorTemp = C2F(bme280.readTemperature());
     }
 
     // Record pressure for trend tracking (every 15 minutes)
@@ -2588,6 +2591,7 @@ void sendApiState(HardwareClient cl) {
   // System info
   doc["board"] = curBoard;
   doc["currentTempRaw"] = curIndoorTemp;  // With decimal precision
+  doc["pt100Present"] = pt100Present;
   doc["sdCard"] = sdCardPresent;
   if (sdCardPresent) {
     doc["sdFormat"] = getSDCardFormat();
@@ -2608,6 +2612,7 @@ void sendApiState(HardwareClient cl) {
   } else if (bme680Present) {
     float pressInHg = bme680.pressure / 100.0 * 0.02953;
     float humidity = bme680.humidity;
+    env["temp"] = (float)C2F(bme680.temperature);
     env["humidity"] = humidity;
     env["pressInhg"] = pressInHg;
     env["dewPoint"] = getDewPointF(curIndoorTemp, humidity);
@@ -2621,6 +2626,7 @@ void sendApiState(HardwareClient cl) {
   } else if (bme280Present) {
     float pressInHg = bme280.readPressure() / 100.0 * 0.02953;
     float humidity = bme280.readHumidity();
+    env["temp"] = (float)C2F(bme280.readTemperature());
     env["humidity"] = humidity;
     env["pressInhg"] = pressInHg;
     env["dewPoint"] = getDewPointF(curIndoorTemp, humidity);
@@ -3015,9 +3021,18 @@ bool resolveVar(const String &varName, String &value) {
 
   // --- Environment (BME) ---
   else if (varName == "BME_PRESENT") {
-    if      (!bmePoweredOn)  value = "";  // Powered off for cold protection
+    if      (!bmePoweredOn)  value = "";  // Powered off for cold mitigation
     else if (bme680Present)  value = "bme680";
     else if (bme280Present)  value = "bme280";
+    else                     value = "";
+  }
+  else if (varName == "PT100_PRESENT") {
+    value = pt100Present ? "1" : "";
+  }
+  else if (varName == "BME_TEMP_RAW") {
+    if      (!bmePoweredOn)  value = "";  // Powered off for cold mitigation
+    else if (bme680Present)  value = String((float)C2F(bme680.temperature), 1);
+    else if (bme280Present)  value = String((float)C2F(bme280.readTemperature()), 1);
     else                     value = "";
   }
   else if (varName == "HUMIDITY") {
@@ -3905,11 +3920,16 @@ void generateIndexHtml() {
   f.println("if(s.heatEnabled){ctx.fillStyle='#FFFF00';ctx.font='14px sans-serif';ctx.fillText('Heat',225,190);}");
   f.println("}");
 
+  // Helper: format temperature, stripping trailing zeros (e.g. 72.7880 -> 72.788)
+  f.println("function fT(v,d){return +v.toFixed(d);}");
   // Info cards builder (sample template order)
   f.println("function buildCards(s){var h='';");
-  // ENVIRONMENT card
-  f.println("if(s.environment){var e=s.environment;h+=\"<div class='card'><div class='label'>ENVIRONMENT (\"+e.sensor+\")</div>\";");
-  f.println("if(s.currentTempRaw!=null)h+=\"<div class='row'><span>Inside Temp (PT100)</span><span class='value'>\"+s.currentTempRaw.toFixed(4)+\"&deg;F</span></div>\";");
+  // ENVIRONMENT card (always shown; PT100 is always present)
+  f.println("var e=s.environment||{};h+=\"<div class='card'><div class='label'>ENVIRONMENT\";");
+  f.println("if(e.sensor&&e.sensor!='off')h+=\"  (\"+e.sensor+\")\";");
+  f.println("h+=\"</div>\";");
+  f.println("if(s.pt100Present&&s.currentTempRaw!=null)h+=\"<div class='row'><span>Temperature (PT100)</span><span class='value'>\"+fT(s.currentTempRaw,4)+\"&deg;F</span></div>\";");
+  f.println("if(e.temp!=null)h+=\"<div class='row'><span>Temperature (\"+e.sensor+\")</span><span class='value'>\"+fT(e.temp,1)+\"&deg;F</span></div>\";" );
   f.println("if(e.humidity!=null)h+=\"<div class='row'><span>Humidity</span><span class='value'>\"+e.humidity.toFixed(1)+\"%</span></div>\";");
   f.println("if(e.pressInhg!=null)h+=\"<div class='row'><span>Pressure</span><span class='value'>\"+e.pressInhg.toFixed(2)+\" inHg</span></div>\";");
   f.println("if(e.gasKohms!=null)h+=\"<div class='row'><span>Gas</span><span class='value'>\"+e.gasKohms.toFixed(1)+\" kOhms</span></div>\";");
@@ -3917,7 +3937,7 @@ void generateIndexHtml() {
   f.println("if(e.pressureTrend){var tc=(e.pressureTrend.indexOf('Rising')>=0)?'#22c55e':(e.pressureTrend.indexOf('Falling')>=0)?'#ef4444':'#eab308';");
   f.println("h+=\"<div class='row'><span>Trend</span><span class='value' style='color:\"+tc+\"'>\"+e.pressureTrend+\"</span></div>\";}");
   f.println("if(e.weatherPrediction)h+=\"<div class='row'><span>Forecast</span><span class='value'>\"+e.weatherPrediction+\"</span></div>\";");
-  f.println("h+=\"</div>\";}");
+  f.println("h+=\"</div>\";");
   // SYSTEM card
   f.println("h+=\"<div class='card'><div class='label'>SYSTEM</div>\";");
   f.println("if(s.board)h+=\"<div class='row'><span>Board</span><span class='value'>\"+s.board+\"</span></div>\";");
@@ -4190,11 +4210,15 @@ void sendPage(HardwareClient cl) {
 
   // R(label,value,color) helper + buildCards with helper
   cl.println(F("function R(l,v,c){return\"<div class='row'><span>\"+l+\"</span><span class='value'\"+(c?\" style='color:\"+c+\"'\":'')+\">\"+v+\"</span></div>\";}"));
-  cl.println(F("function buildCards(s){var h='';if(s.environment){var e=s.environment;h+=\"<div class='card'><div class='label'>ENVIRONMENT (\"+e.sensor+\")</div>\";"));
+  cl.println(F("function fT(v,d){return +v.toFixed(d);}"));
+  cl.println(F("function buildCards(s){var h='';var e=s.environment||{};h+=\"<div class='card'><div class='label'>ENVIRONMENT\";"));
+  cl.println(F("if(e.sensor&&e.sensor!='off')h+='  ('+e.sensor+')';h+=\"</div>\";"));
+  cl.println(F("if(s.pt100Present&&s.currentTempRaw!=null)h+=R('Temperature (PT100)',fT(s.currentTempRaw,4)+'&deg;F');"));
+  cl.println(F("if(e.temp!=null)h+=R('Temperature ('+e.sensor+')',fT(e.temp,1)+'&deg;F');"));
   cl.println(F("if(e.humidity!=null)h+=R('Humidity',e.humidity.toFixed(1)+'%');if(e.pressInhg!=null)h+=R('Pressure',e.pressInhg.toFixed(2)+' inHg');"));
   cl.println(F("if(e.gasKohms!=null)h+=R('Gas',e.gasKohms.toFixed(1)+' kOhms');if(e.dewPoint!=null)h+=R('Dew Point',e.dewPoint.toFixed(1)+'&deg;F');"));
   cl.println(F("if(e.pressureTrend){var tc=e.pressureTrend.indexOf('Rising')>=0?'#22c55e':e.pressureTrend.indexOf('Falling')>=0?'#ef4444':'#eab308';h+=R('Trend',e.pressureTrend,tc);}"));
-  cl.println(F("if(e.weatherPrediction)h+=R('Forecast',e.weatherPrediction);h+=\"</div>\";}"));
+  cl.println(F("if(e.weatherPrediction)h+=R('Forecast',e.weatherPrediction);h+=\"</div>\";"));
   cl.println(F("h+=\"<div class='card'><div class='label'>SYSTEM</div>\";if(s.board)h+=R('Board',s.board);"));
   cl.println(F("if(s.network){var n=s.network;if(n.mode==='dual'){if(n.ethernet){var e=n.ethernet;h+=R('Eth IP',e.ip)+R('Eth MAC',e.mac)+R('Eth Link',e.link,e.link==='Connected'?'#22c55e':'#ef4444');}"));
   cl.println(F("if(n.wifi){var w=n.wifi;h+=R('WiFi IP',w.ip)+R('WiFi MAC',w.mac);if(w.ssid)h+=R('WiFi SSID',w.ssid);h+=R('WiFi Link',w.link,w.link==='Connected'?'#22c55e':'#ef4444');}}else{"));
