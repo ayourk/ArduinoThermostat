@@ -1720,6 +1720,8 @@ are served via /indoorjson with INDOOR_* prefixed keys.
   HEAT_ACTIVE_TEXT         On             "On" or "Off"
 
   BME_PRESENT              bme680         "bme280", "bme680", or "" if none
+  PT100_PRESENT            pt100          "pt100" if detected, "" if absent
+  BME_TEMP_RAW             72.3           BME temperature °F, 1 decimal (or "")
   HUMIDITY                 45.2           Relative humidity % (or "")
   PRESSURE_HPA             1013.25        Barometric pressure hPa (or "")
   PRESSURE_INHG            29.92          Barometric pressure inHg (or "")
@@ -2530,15 +2532,29 @@ integrations.
     "targetTemp": 71,
     "heatEnabled": true,
     "heatActive": false,
-    "showSettings": false,
+    "settingsScreen": "off",
+    "lastHeatChange": 0,
     "lastChange": 45230,
     "uptime": 360000,
     "tempColor": "#00FF00",
+    "board": "Adafruit Feather ESP32-S2 (Dual Network)",
+    "currentTempRaw": 72.3456,
+    "pt100Present": true,
+    "sdCard": true,
+    "sdFormat": "exFAT",
+    "displayPresent": true,
+    "otaSupported": false,
+    "freeRam": 79080,
     "environment": {
+      "temp": 72.3,
       "humidity": 45.2,
       "pressInhg": 29.92,
+      "dewPoint": 51.8,
       "gasKohms": 145.2,
-      "sensor": "BME680"
+      "sensor": "BME680",
+      "pressureCategory": "Normal",
+      "pressureTrend": "Steady",
+      "weatherPrediction": "Fair"
     },
     "outdoor": {
       "configured": true,
@@ -2565,6 +2581,11 @@ integrations.
 
 Notes:
   - environment{} is empty if no BME sensor is detected
+  - environment.temp is the BME sensor temperature in °F (1 decimal)
+  - pt100Present is true when the PT100 RTD is detected, false on
+    open-circuit fault (MAX31865 RTDINLOW | REFINHIGH)
+  - currentTempRaw is the PT100 temperature with full decimal precision;
+    falls back to BME temperature when pt100Present is false
   - environment.gasKohms is present only with BME680 (not BME280)
   - outdoor.temp/humidity/etc. fields are present only when status="Online"
   - outdoor.ip/port/pollSecs are present only when configured=true

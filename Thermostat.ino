@@ -3027,7 +3027,7 @@ bool resolveVar(const String &varName, String &value) {
     else                     value = "";
   }
   else if (varName == "PT100_PRESENT") {
-    value = pt100Present ? "1" : "";
+    value = pt100Present ? "pt100" : "";
   }
   else if (varName == "BME_TEMP_RAW") {
     if      (!bmePoweredOn)  value = "";  // Powered off for cold mitigation
